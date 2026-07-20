@@ -1,17 +1,51 @@
-# vibequickpdf
 
-A new Flutter project.
+# VibeQuickPDF
 
-## Getting Started
+แอป Flutter ขนาดเล็กและรวดเร็วสำหรับแปลงรูปภาพเป็นไฟล์ PDF
 
-This project is a starting point for a Flutter application.
+## รูปภาพตัวอย่าง
 
-A few resources to get you started if this is your first Flutter project:
+หน้าหลัก (ว่างปล่าว)          |  หน้าสร้างไฟล์ PDF
+:-------------------------:|:-------------------------:
+![Main Screen](/asset/1.0.0_main_screen.jpg)  | ![Create Screen](/asset/1.0.0_create_screen.jpg)
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## คุณสมบัติ
+- การแปลงภาพเป็น PDF อย่างรวดเร็ว
+- เลือกรูปภาพจากที่เก็บข้อมูลหรือกล้อง
+- จัดลำดับหน้าก่อนส่งออก
+- แชร์หรือบันทึกไฟล์ PDF ที่สร้างขึ้น
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## ความต้องการระบบ
+- Flutter (stable channel)
+- SDK ของแพลตฟอร์มสำหรับ Android และ iOS (เมื่อสร้างแอปสำหรับอุปกรณ์จริง)
+
+## เริ่มต้นอย่างรวดเร็ว
+
+โคลนรีโพ และติดตั้ง dependencies:
+
+```bash
+git clone https://github.com/JittiponPannak/VibeQuickPDF.git
+cd VibeQuickPDF
+flutter pub get
+```
+
+รันบนอุปกรณ์ที่เชื่อมต่อหรือตัวจำลอง:
+
+```bash
+flutter run
+```
+
+สร้างไฟล์ APK สำหรับ Android (release):
+
+```bash
+flutter build apk --release
+```
+
+## โครงสร้างโปรเจกต์
+
+- [lib/main.dart](lib/main.dart): จุดเริ่มต้นของแอป
+- [lib/screens/home_screen.dart](lib/screens/home_screen.dart): UI หน้าแรกและการไหลหลัก
+- [lib/screens/conversion_screen.dart](lib/screens/conversion_screen.dart): หน้าเลือกภาพและแปลงเป็น PDF
+- [lib/services/file_service.dart](lib/services/file_service.dart): ฟังก์ชันช่วยจัดการไฟล์และการเข้าถึงที่เก็บ
+- [lib/services/pdf_service.dart](lib/services/pdf_service.dart): ตรรกะการสร้าง PDF
+- [lib/models/pdf_file.dart](lib/models/pdf_file.dart): โมเดลข้อมูลเมตาของ PDF
