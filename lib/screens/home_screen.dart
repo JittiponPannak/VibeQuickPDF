@@ -6,6 +6,7 @@ import 'package:flutter_sharing_intent/flutter_sharing_intent.dart';
 import 'package:flutter_sharing_intent/model/sharing_file.dart';
 import '../models/pdf_file.dart';
 import '../services/file_service.dart';
+import '../services/pdf_service.dart';
 import 'conversion_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final FileService _fileService = FileService();
+  final PdfService _pdfService = PdfService();
   List<PdfFile> _pdfFiles = [];
   bool _isLoading = true;
   late StreamSubscription _intentMediaStreamSubscription;
@@ -118,6 +120,34 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _quickExport() async {
+    final picker = ImagePicker();
+    try {
+      final List<XFile> images = await picker.pickMultiImage();
+      if (images.isEmpty) return;
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final paths = images.map((e) => e.path).toList();
+      final pdfBytes = await _pdfService.createPdfFromImages(paths);
+      await _fileService.sharePdfBytes(pdfBytes, 'QuickPDF');
+
+      if (mounted) Navigator.pop(context); // dismiss loading
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // dismiss loading if still showing
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -192,32 +222,58 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 64,
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ConversionScreen(),
+          child: Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 64,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ConversionScreen(),
+                        ),
+                      );
+                      if (result == true) {
+                        _loadFiles();
+                      }
+                    },
+                    icon: const Icon(Icons.add, size: 28),
+                    label: const Text(
+                      'สร้าง PDF',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
-                );
-                if (result == true) {
-                  _loadFiles();
-                }
-              },
-              icon: const Icon(Icons.add, size: 28),
-              label: const Text(
-                'สร้าง PDF',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-            ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: SizedBox(
+                  height: 64,
+                  child: ElevatedButton.icon(
+                    onPressed: _quickExport,
+                    icon: const Icon(Icons.bolt, size: 28),
+                    label: const Text(''),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber.shade700,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

@@ -1,5 +1,5 @@
-name: vibequickpdf
-description: "A new Flutter project."
+name: vibe_quick_pdf
+description: "แอป Flutter ขนาดเล็กและรวดเร็วสำหรับแปลงรูปภาพเป็นไฟล์ PDF"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -41,6 +41,7 @@ dependencies:
   open_filex: ^4.7.0
   intl: ^0.20.3
   flutter_sharing_intent: ^2.0.4
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:
