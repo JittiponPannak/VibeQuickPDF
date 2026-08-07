@@ -120,6 +120,31 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showRetryShareDialog(Future<void> Function() onRetry) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('การแชร์ไม่สำเร็จ'),
+        content: const Text(
+          'ดูเหมือนว่าการแชร์จะไม่สมบูรณ์ คุณต้องการลองอีกครั้งหรือไม่?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ยกเลิก'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              onRetry();
+            },
+            child: const Text('ลองใหม่'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _quickExport() async {
     final picker = ImagePicker();
     try {
@@ -135,9 +160,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final paths = images.map((e) => e.path).toList();
       final pdfBytes = await _pdfService.createPdfFromImages(paths);
-      await _fileService.sharePdfBytes(pdfBytes, 'QuickPDF');
-
+      final success = await _fileService.sharePdfBytes(pdfBytes, 'QuickPDF');
       if (mounted) Navigator.pop(context); // dismiss loading
+
+      if (!success && mounted) {
+        _showRetryShareDialog(() => _quickExport());
+      }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // dismiss loading if still showing
@@ -207,7 +235,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.share, color: Colors.blue),
-                          onPressed: () => _fileService.sharePdf(file.path),
+                          onPressed: () async {
+                            final success = await _fileService.sharePdf(
+                              file.path,
+                            );
+                            if (!success && context.mounted) {
+                              _showRetryShareDialog(
+                                () => _fileService.sharePdf(file.path),
+                              );
+                            }
+                          },
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete, color: Colors.red),
@@ -255,22 +292,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: SizedBox(
-                  height: 64,
-                  child: ElevatedButton.icon(
-                    onPressed: _quickExport,
-                    icon: const Icon(Icons.bolt, size: 28),
-                    label: const Text(''),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber.shade700,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: ElevatedButton(
+                  onPressed: _quickExport,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.amber.shade700,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
+                  child: const Icon(Icons.bolt, size: 28),
                 ),
               ),
             ],

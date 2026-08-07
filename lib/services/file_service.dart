@@ -61,20 +61,27 @@ class FileService {
     return fullPath;
   }
 
-  Future<void> sharePdf(String path) async {
-    await Share.shareXFiles([XFile(path)], text: 'สร้างด้วย VibeQuickPDF');
+  Future<bool> sharePdf(String path) async {
+    final result = await SharePlus.instance.share(
+      ShareParams(files: [XFile(path)], text: 'สร้างด้วย VibeQuickPDF'),
+    );
+    return result.status == ShareResultStatus.success;
   }
 
   /// Shares PDF bytes via the system share sheet using a temporary file.
   /// No permanent file is saved on the device.
-  Future<void> sharePdfBytes(List<int> bytes, String displayName) async {
+  Future<bool> sharePdfBytes(List<int> bytes, String displayName) async {
     final tempDir = await getTemporaryDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final tempFile = File('${tempDir.path}/${displayName}_$timestamp.pdf');
     await tempFile.writeAsBytes(bytes);
-    await Share.shareXFiles([
-      XFile(tempFile.path),
-    ], text: 'สร้างด้วย VibeQuickPDF');
+    final result = await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(tempFile.path)],
+        text: 'สร้างด้วย VibeQuickPDF',
+      ),
+    );
+    return result.status == ShareResultStatus.success;
   }
 
   Future<void> openPdf(String path) async {
