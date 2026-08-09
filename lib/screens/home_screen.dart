@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_sharing_intent/flutter_sharing_intent.dart';
 import 'package:flutter_sharing_intent/model/sharing_file.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../models/pdf_file.dart';
 import '../services/file_service.dart';
 import '../services/pdf_service.dart';
@@ -21,12 +22,14 @@ class _HomeScreenState extends State<HomeScreen> {
   final PdfService _pdfService = PdfService();
   List<PdfFile> _pdfFiles = [];
   bool _isLoading = true;
+  String _version = '';
   late StreamSubscription _intentMediaStreamSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadFiles();
+    _initPackageInfo();
 
     // For sharing images coming from outside the app while the app is in the memory
     _intentMediaStreamSubscription = FlutterSharingIntent.instance
@@ -54,6 +57,15 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     });
+  }
+
+  Future<void> _initPackageInfo() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        info._version = info.version;
+      });
+    }
   }
 
   void _handleSharedMedia(List<SharedFile> sharedFiles) async {
@@ -223,7 +235,20 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('VibeQuickPDF'),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('VibeQuickPDF'),
+            if (_version.isNotEmpty)
+              Text(
+                'v$_version',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+          ],
+        ),
         centerTitle: true,
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadFiles),
