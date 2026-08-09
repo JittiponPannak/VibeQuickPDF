@@ -34,7 +34,9 @@ class _HomeScreenState extends State<HomeScreen> {
         .listen(
           (List<SharedFile> value) {
             if (value.isNotEmpty) {
-              _handleSharedMedia(value);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _handleSharedMedia(value);
+              });
             }
           },
           onError: (err) {
@@ -47,7 +49,9 @@ class _HomeScreenState extends State<HomeScreen> {
       List<SharedFile> value,
     ) {
       if (value.isNotEmpty) {
-        _handleSharedMedia(value);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _handleSharedMedia(value);
+        });
       }
     });
   }
@@ -61,14 +65,41 @@ class _HomeScreenState extends State<HomeScreen> {
     final xFiles = imageFiles.map((f) => XFile(f.value!)).toList();
     FlutterSharingIntent.instance.reset();
 
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ConversionScreen(initialImages: xFiles),
+    if (!mounted) return;
+
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('เลือกรูปแบบการสร้าง PDF'),
+        content: const Text(
+          'คุณได้รับรูปภาพที่แชร์มา คุณต้องการสร้าง PDF แบบใด?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'normal'),
+            child: const Text('สร้างปกติ'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'quick'),
+            child: const Text('Quick PDF'),
+          ),
+        ],
       ),
     );
-    if (result == true) {
-      _loadFiles();
+
+    if (choice == 'normal') {
+      if (!mounted) return;
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ConversionScreen(initialImages: xFiles),
+        ),
+      );
+      if (result == true) {
+        _loadFiles();
+      }
+    } else if (choice == 'quick') {
+      await _processQuickExport(xFiles);
     }
   }
 
@@ -145,13 +176,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _quickExport() async {
-    final picker = ImagePicker();
+  Future<void> _processQuickExport(List<XFile> images) async {
     try {
-      final List<XFile> images = await picker.pickMultiImage();
-      if (images.isEmpty) return;
-
       if (!mounted) return;
+
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -164,11 +192,26 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) Navigator.pop(context); // dismiss loading
 
       if (!success && mounted) {
-        _showRetryShareDialog(() => _quickExport());
+        _showRetryShareDialog(() => _processQuickExport(images));
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // dismiss loading if still showing
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
+      }
+    }
+  }
+
+  Future<void> _quickExport() async {
+    final picker = ImagePicker();
+    try {
+      final List<XFile> images = await picker.pickMultiImage();
+      if (images.isEmpty) return;
+      await _processQuickExport(images);
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
