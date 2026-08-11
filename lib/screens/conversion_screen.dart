@@ -1,6 +1,9 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_sharing_intent/flutter_sharing_intent.dart';
+import 'package:flutter_sharing_intent/model/sharing_file.dart';
 import '../services/pdf_service.dart';
 import '../services/file_service.dart';
 
@@ -21,6 +24,7 @@ class _ConversionScreenState extends State<ConversionScreen> {
   final List<XFile> _selectedImages = [];
   bool _isGenerating = false;
   bool _mergeIntoSingle = true;
+  late StreamSubscription _intentMediaStreamSubscription;
 
   final TextEditingController _fileNameController = TextEditingController(
     text: 'เอกสาร',
@@ -32,12 +36,105 @@ class _ConversionScreenState extends State<ConversionScreen> {
     if (widget.initialImages != null) {
       _selectedImages.addAll(widget.initialImages!);
     }
+
+    _intentMediaStreamSubscription = FlutterSharingIntent.instance
+        .getMediaStream()
+        .listen(
+          (List<SharedFile> value) {
+            if (value.isNotEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _handleSharedMedia(value);
+              });
+            }
+          },
+          onError: (err) {
+            debugPrint("getMediaStream error: $err");
+          },
+        );
   }
 
   @override
   void dispose() {
+    _intentMediaStreamSubscription.cancel();
     _fileNameController.dispose();
     super.dispose();
+  }
+
+  void _handleSharedMedia(List<SharedFile> sharedFiles) async {
+    final imageFiles = sharedFiles
+        .where((f) => f.type == SharedMediaType.IMAGE)
+        .toList();
+    if (imageFiles.isEmpty) return;
+
+    final xFiles = imageFiles.map((f) => XFile(f.value!)).toList();
+    FlutterSharingIntent.instance.reset(); // clear it
+
+    if (!mounted) return;
+
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ได้รับรูปภาพที่แชร์มา'),
+        content: const Text('คุณต้องการทำสิ่งใดกับรูปภาพนี้?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'append'),
+            child: const Text('เพิ่มในรายการนี้'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'new'),
+            child: const Text('สร้าง Batch ใหม่'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'quick'),
+            child: const Text('Quick PDF'),
+          ),
+        ],
+      ),
+    );
+
+    if (choice == 'append') {
+      setState(() {
+        _selectedImages.addAll(xFiles);
+      });
+    } else if (choice == 'new') {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ConversionScreen(initialImages: xFiles),
+        ),
+      );
+    } else if (choice == 'quick') {
+      await _processQuickExport(xFiles);
+    }
+  }
+
+  Future<void> _processQuickExport(List<XFile> images) async {
+    try {
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final paths = images.map((e) => e.path).toList();
+      final pdfBytes = await _pdfService.createPdfFromImages(paths);
+      final success = await _fileService.sharePdfBytes(pdfBytes, 'QuickPDF');
+
+      if (mounted) Navigator.pop(context); // dismiss loading
+
+      if (!success && mounted) {
+        _showError('การแชร์ไม่สำเร็จ');
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // dismiss loading if showing
+        _showError('เกิดข้อผิดพลาด: $e');
+      }
+    }
   }
 
   Future<void> _pickImages() async {

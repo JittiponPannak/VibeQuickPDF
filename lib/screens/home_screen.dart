@@ -22,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final PdfService _pdfService = PdfService();
   List<PdfFile> _pdfFiles = [];
   bool _isLoading = true;
+  bool _isConversionScreenOpen = false;
   String _version = '';
   late StreamSubscription _intentMediaStreamSubscription;
 
@@ -69,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _handleSharedMedia(List<SharedFile> sharedFiles) async {
+    if (_isConversionScreenOpen) return;
     final imageFiles = sharedFiles
         .where((f) => f.type == SharedMediaType.IMAGE)
         .toList();
@@ -101,12 +103,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (choice == 'normal') {
       if (!mounted) return;
+      _isConversionScreenOpen = true;
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ConversionScreen(initialImages: xFiles),
         ),
       );
+      _isConversionScreenOpen = false;
       if (result == true) {
         _loadFiles();
       }
@@ -239,12 +243,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
+      _isConversionScreenOpen = true;
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ConversionScreen(initialImages: [image]),
         ),
       );
+      _isConversionScreenOpen = false;
       if (result == true) {
         _loadFiles();
       }
@@ -377,12 +383,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   height: 64,
                   child: ElevatedButton.icon(
                     onPressed: () async {
+                      _isConversionScreenOpen = true;
                       final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => const ConversionScreen(),
                         ),
                       );
+                      _isConversionScreenOpen = false;
                       if (result == true) {
                         _loadFiles();
                       }
