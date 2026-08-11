@@ -1,12 +1,9 @@
 
 # VibeQuickPDF
 
-<center>
-<img src="assets/icon.svg" width=128 height=128>
+<img src="assets/icon.png" width=128 height=128>
 
 แอป Flutter ขนาดเล็กและรวดเร็วสำหรับแปลงรูปภาพเป็นไฟล์ PDF
-
-</center>
 
 ## เหตุจูงใจสำหรับการพัฒนาแอปพลิเคชั่น
 
