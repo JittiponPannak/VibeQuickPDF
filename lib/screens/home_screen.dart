@@ -231,6 +231,32 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _captureFromCamera() async {
+    final picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(source: ImageSource.camera);
+      if (image == null) return;
+
+      if (!mounted) return;
+
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ConversionScreen(initialImages: [image]),
+        ),
+      );
+      if (result == true) {
+        _loadFiles();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -329,6 +355,23 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(16.0),
           child: Row(
             children: [
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: ElevatedButton(
+                  onPressed: _captureFromCamera,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal.shade500,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Icon(Icons.camera_alt, size: 28),
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: SizedBox(
                   height: 64,
