@@ -267,6 +267,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Image.asset('assets/icon.png'),
+        ),
         title: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
