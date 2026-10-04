@@ -136,8 +136,11 @@ void main() {
     await tester.pump();
 
     expect(find.text('Add images to start creating PDF'), findsOneWidget);
-    expect(find.text('Camera'), findsAtLeastNWidgets(1));
-    expect(find.text('Gallery'), findsAtLeastNWidgets(1));
+    // Verifies no duplicate buttons on empty screen
+    expect(find.text('Camera'), findsOneWidget);
+    expect(find.text('Gallery'), findsOneWidget);
+    // Verifies Quick PDF setting switch exists
+    expect(find.text('Quick PDF'), findsOneWidget);
 
     // Thai test
     await tester.pumpWidget(
@@ -156,7 +159,9 @@ void main() {
     await tester.pump();
 
     expect(find.text('เพิ่มรูปภาพเพื่อเริ่มต้นสร้าง PDF'), findsOneWidget);
-    expect(find.text('ถ่ายรูป'), findsAtLeastNWidgets(1));
-    expect(find.text('เลือกจากคลัง'), findsAtLeastNWidgets(1));
+    // Verifies no duplicate buttons on empty screen in Thai
+    expect(find.text('ถ่ายรูป'), findsOneWidget);
+    expect(find.text('เลือกจากคลัง'), findsOneWidget);
+    expect(find.text('Quick PDF'), findsOneWidget);
   });
 }

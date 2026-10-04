@@ -103,6 +103,10 @@ class AppLocalizations {
       : (isThai
           ? 'แต่ละรูปภาพจะถูกแยกเป็น PDF คนละไฟล์'
           : 'Each image will be saved as an individual PDF');
+  String get quickPdfTitle => 'Quick PDF';
+  String get quickPdfSubtitle => isThai
+      ? 'สร้างและแชร์ PDF ทันทีหลังจากเลือกรูปภาพ'
+      : 'Automatically create and share PDF immediately after picking images';
 
   // Conversion Screen - Actions
   String get saveToDisk => isThai ? 'บันทึกในเครื่อง' : 'Save to Device';

@@ -25,6 +25,7 @@ class _ConversionScreenState extends State<ConversionScreen> {
   final List<XFile> _selectedImages = [];
   bool _isGenerating = false;
   bool _mergeIntoSingle = true;
+  bool _quickPdf = false;
   late StreamSubscription _intentMediaStreamSubscription;
 
   final TextEditingController _fileNameController = TextEditingController();
@@ -118,6 +119,9 @@ class _ConversionScreenState extends State<ConversionScreen> {
             content: Text(l10n.imagesAddedSuccess(xFiles.length)),
           ),
         );
+        if (_quickPdf) {
+          _generatePdf(share: true);
+        }
       }
     } else if (choice == 'replace') {
       setState(() {
@@ -132,6 +136,9 @@ class _ConversionScreenState extends State<ConversionScreen> {
             ),
           ),
         );
+        if (_quickPdf) {
+          _generatePdf(share: true);
+        }
       }
     }
   }
@@ -143,6 +150,9 @@ class _ConversionScreenState extends State<ConversionScreen> {
         setState(() {
           _selectedImages.addAll(images);
         });
+        if (_quickPdf && mounted) {
+          _generatePdf(share: true);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -158,6 +168,9 @@ class _ConversionScreenState extends State<ConversionScreen> {
         setState(() {
           _selectedImages.add(image);
         });
+        if (_quickPdf && mounted) {
+          _generatePdf(share: true);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -424,6 +437,36 @@ class _ConversionScreenState extends State<ConversionScreen> {
                 });
               },
             ),
+            const Divider(height: 1),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Row(
+                children: [
+                  const Icon(Icons.bolt, color: Colors.amber, size: 20),
+                  const SizedBox(width: 6),
+                  Text(
+                    l10n.quickPdfTitle,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
+              subtitle: Text(
+                l10n.quickPdfSubtitle,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+              ),
+              value: _quickPdf,
+              onChanged: (value) {
+                setState(() {
+                  _quickPdf = value;
+                });
+                if (_quickPdf && _selectedImages.isNotEmpty) {
+                  _generatePdf(share: true);
+                }
+              },
+            ),
           ],
         ),
       ),
@@ -678,22 +721,23 @@ class _ConversionScreenState extends State<ConversionScreen> {
       appBar: AppBar(
         title: Text(l10n.createPdf),
         actions: [
-          if (_selectedImages.isNotEmpty)
+          if (_selectedImages.isNotEmpty) ...[
             IconButton(
               icon: const Icon(Icons.delete_sweep_outlined),
               onPressed: _confirmClearAll,
               tooltip: l10n.clearAll,
             ),
-          IconButton(
-            icon: const Icon(Icons.camera_alt),
-            onPressed: _captureFromCamera,
-            tooltip: l10n.takePhoto,
-          ),
-          IconButton(
-            icon: const Icon(Icons.add_photo_alternate),
-            onPressed: _pickImages,
-            tooltip: l10n.chooseFromGallery,
-          ),
+            IconButton(
+              icon: const Icon(Icons.camera_alt),
+              onPressed: _captureFromCamera,
+              tooltip: l10n.takePhoto,
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_photo_alternate),
+              onPressed: _pickImages,
+              tooltip: l10n.chooseFromGallery,
+            ),
+          ],
         ],
       ),
       body: _isGenerating
@@ -718,109 +762,59 @@ class _ConversionScreenState extends State<ConversionScreen> {
                 ),
               ],
             ),
-      bottomNavigationBar: !_isGenerating
+      bottomNavigationBar: (!_isGenerating && _selectedImages.isNotEmpty)
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: _selectedImages.isEmpty
-                    ? Row(
-                        children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: 56,
-                              child: ElevatedButton.icon(
-                                onPressed: _captureFromCamera,
-                                icon: const Icon(Icons.camera_alt),
-                                label: Text(
-                                  l10n.takePhoto,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.teal.shade600,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 56,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _generatePdf(share: false),
+                          icon: const Icon(Icons.save_alt, size: 22),
+                          label: Text(
+                            l10n.saveToDisk,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: SizedBox(
-                              height: 56,
-                              child: ElevatedButton.icon(
-                                onPressed: _pickImages,
-                                icon: const Icon(Icons.photo_library),
-                                label: Text(
-                                  l10n.chooseFromGallery,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
+                          style: ElevatedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: 56,
-                              child: ElevatedButton.icon(
-                                onPressed: () => _generatePdf(share: false),
-                                icon: const Icon(Icons.save_alt, size: 22),
-                                label: Text(
-                                  l10n.saveToDisk,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: SizedBox(
-                              height: 56,
-                              child: ElevatedButton.icon(
-                                onPressed: () => _generatePdf(share: true),
-                                icon: const Icon(Icons.share, size: 22),
-                                label: Text(
-                                  l10n.share,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.amber.shade700,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 56,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _generatePdf(share: true),
+                          icon: const Icon(Icons.share, size: 22),
+                          label: Text(
+                            l10n.share,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.amber.shade700,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             )
           : null,
