@@ -7,9 +7,11 @@ import 'package:flutter_sharing_intent/model/sharing_file.dart';
 import '../l10n/app_localizations.dart';
 import '../services/pdf_service.dart';
 import '../services/file_service.dart';
+import '../widgets/shared_media_dialog.dart';
 
 class ConversionScreen extends StatefulWidget {
   final List<XFile>? initialImages;
+  static List<XFile> currentDraftImages = [];
 
   const ConversionScreen({super.key, this.initialImages});
 
@@ -35,6 +37,7 @@ class _ConversionScreenState extends State<ConversionScreen> {
     super.initState();
     if (widget.initialImages != null) {
       _selectedImages.addAll(widget.initialImages!);
+      ConversionScreen.currentDraftImages = List.from(_selectedImages);
     }
 
     _intentMediaStreamSubscription = FlutterSharingIntent.instance
@@ -72,46 +75,17 @@ class _ConversionScreenState extends State<ConversionScreen> {
     if (!mounted) return;
     final l10n = AppLocalizations.of(context);
 
-    if (_selectedImages.isEmpty) {
-      setState(() {
-        _selectedImages.addAll(xFiles);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.imagesAddedSuccess(xFiles.length)),
-        ),
-      );
-      return;
-    }
-
-    final choice = await showDialog<String>(
+    final action = await showSharedMediaApplicationDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.sharedMediaTitle),
-        content: Text(
-          l10n.sharedMediaQuestion(xFiles.length),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'replace'),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(l10n.replaceExisting),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'append'),
-            child: Text(l10n.appendToEnd),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'cancel'),
-            child: Text(l10n.cancel),
-          ),
-        ],
-      ),
+      count: xFiles.length,
     );
 
-    if (choice == 'append') {
+    if (!mounted || action == null) return;
+
+    if (action == SharedMediaAction.append) {
       setState(() {
         _selectedImages.addAll(xFiles);
+        ConversionScreen.currentDraftImages = List.from(_selectedImages);
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -123,10 +97,12 @@ class _ConversionScreenState extends State<ConversionScreen> {
           _generatePdf(share: true);
         }
       }
-    } else if (choice == 'replace') {
+    } else if (action == SharedMediaAction.createNew) {
       setState(() {
         _selectedImages.clear();
         _selectedImages.addAll(xFiles);
+        ConversionScreen.currentDraftImages = List.from(_selectedImages);
+        _fileNameController.clear();
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -183,6 +159,151 @@ class _ConversionScreenState extends State<ConversionScreen> {
     setState(() {
       _selectedImages.removeAt(index);
     });
+  }
+
+  void _reorderImages(int oldIndex, int newIndex) {
+    if (oldIndex == newIndex) return;
+    if (oldIndex < 0 || oldIndex >= _selectedImages.length) return;
+    if (newIndex < 0 || newIndex >= _selectedImages.length) return;
+
+    setState(() {
+      final item = _selectedImages.removeAt(oldIndex);
+      _selectedImages.insert(newIndex, item);
+    });
+  }
+
+  void _showReorderModal(int index) {
+    final l10n = AppLocalizations.of(context);
+    final image = _selectedImages[index];
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      File(image.path),
+                      width: 52,
+                      height: 52,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.pageNumber(index + 1),
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          l10n.reorderHint,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: index > 0
+                          ? () {
+                              Navigator.pop(context);
+                              _reorderImages(index, 0);
+                            }
+                          : null,
+                      icon: const Icon(Icons.first_page, size: 20),
+                      label: Text(l10n.moveToFirst),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: index > 0
+                          ? () {
+                              Navigator.pop(context);
+                              _reorderImages(index, index - 1);
+                            }
+                          : null,
+                      icon: const Icon(Icons.arrow_back, size: 18),
+                      label: Text(l10n.movePrevious),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: index < _selectedImages.length - 1
+                          ? () {
+                              Navigator.pop(context);
+                              _reorderImages(index, index + 1);
+                            }
+                          : null,
+                      icon: const Icon(Icons.arrow_forward, size: 18),
+                      label: Text(l10n.moveNext),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: index < _selectedImages.length - 1
+                          ? () {
+                              Navigator.pop(context);
+                              _reorderImages(index, _selectedImages.length - 1);
+                            }
+                          : null,
+                      icon: const Icon(Icons.last_page, size: 20),
+                      label: Text(l10n.moveToLast),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _removeImage(index);
+                  },
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  label: Text(
+                    l10n.delete,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showError(String message) {
@@ -567,12 +688,35 @@ class _ConversionScreenState extends State<ConversionScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                l10n.selectedImagesCount(_selectedImages.length),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.selectedImagesCount(_selectedImages.length),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.swap_horiz,
+                        size: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        l10n.reorderHint,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
               Row(
                 children: [
@@ -603,109 +747,242 @@ class _ConversionScreenState extends State<ConversionScreen> {
             itemCount: _selectedImages.length + 1,
             itemBuilder: (context, index) {
               if (index == _selectedImages.length) {
-                return InkWell(
-                  onTap: _showAddImageModal,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Colors.grey.shade400,
-                        width: 1.5,
+                return DragTarget<int>(
+                  onWillAcceptWithDetails: (details) =>
+                      details.data != _selectedImages.length - 1,
+                  onAcceptWithDetails: (details) {
+                    _reorderImages(details.data, _selectedImages.length - 1);
+                  },
+                  builder: (context, candidateData, rejectedData) {
+                    final isHovered = candidateData.isNotEmpty;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: isHovered
+                            ? Border.all(
+                                color: Theme.of(context).colorScheme.primary,
+                                width: 2.5,
+                              )
+                            : null,
                       ),
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.grey.shade100,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.add_photo_alternate_outlined,
-                          color: Theme.of(context).colorScheme.primary,
-                          size: 32,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          l10n.addPhotoTile,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                      child: InkWell(
+                        onTap: _showAddImageModal,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Colors.grey.shade400,
+                              width: 1.5,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.grey.shade100,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.add_photo_alternate_outlined,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 32,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                l10n.addPhotoTile,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 );
               }
 
               final image = _selectedImages[index];
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Image.file(
-                      File(image.path),
-                      fit: BoxFit.cover,
-                    ),
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: 36,
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.black54, Colors.transparent],
-                          ),
+              return DragTarget<int>(
+                onWillAcceptWithDetails: (details) => details.data != index,
+                onAcceptWithDetails: (details) {
+                  _reorderImages(details.data, index);
+                },
+                builder: (context, candidateData, rejectedData) {
+                  final isHovered = candidateData.isNotEmpty;
+                  return LongPressDraggable<int>(
+                    data: index,
+                    delay: const Duration(milliseconds: 150),
+                    feedback: Material(
+                      elevation: 8,
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.transparent,
+                      child: SizedBox(
+                        width: 100,
+                        height: 115,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                File(image.path),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  width: 2.5,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 4,
+                              left: 4,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '${index + 1}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    Positioned(
-                      top: 2,
-                      right: 2,
-                      child: GestureDetector(
-                        onTap: () => _removeImage(index),
+                    childWhenDragging: Opacity(
+                      opacity: 0.25,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.black45,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            size: 16,
+                          color: Colors.grey.shade300,
+                          child: const Center(
+                            child: Icon(
+                              Icons.swap_horiz,
+                              color: Colors.grey,
+                              size: 28,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    Positioned(
-                      bottom: 4,
-                      left: 4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black87,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '${index + 1}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: isHovered
+                            ? Border.all(
+                                color: Theme.of(context).colorScheme.primary,
+                                width: 3,
+                              )
+                            : null,
+                      ),
+                      child: InkWell(
+                        onTap: () => _showReorderModal(index),
+                        borderRadius: BorderRadius.circular(12),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.file(
+                                File(image.path),
+                                fit: BoxFit.cover,
+                              ),
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: 36,
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.black54,
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 2,
+                                right: 2,
+                                child: GestureDetector(
+                                  onTap: () => _removeImage(index),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black45,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 4,
+                                left: 4,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black87,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.drag_indicator,
+                                        color: Colors.white70,
+                                        size: 12,
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        '${index + 1}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  );
+                },
               );
             },
           ),

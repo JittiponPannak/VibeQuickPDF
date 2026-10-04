@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../l10n/app_localizations.dart';
 import '../models/pdf_file.dart';
 import '../services/file_service.dart';
+import '../widgets/shared_media_dialog.dart';
 
 import 'conversion_screen.dart';
 
@@ -79,11 +80,29 @@ class _HomeScreenState extends State<HomeScreen> {
     final xFiles = imageFiles.map((f) => XFile(f.value!)).toList();
     FlutterSharingIntent.instance.reset();
 
+    if (!mounted) return;
+
+    final action = await showSharedMediaApplicationDialog(
+      context: context,
+      count: xFiles.length,
+    );
+
+    if (!mounted || action == null) return;
+
+    final List<XFile> imagesToOpen;
+    if (action == SharedMediaAction.append) {
+      imagesToOpen = [...ConversionScreen.currentDraftImages, ...xFiles];
+    } else {
+      ConversionScreen.currentDraftImages.clear();
+      imagesToOpen = xFiles;
+    }
+    ConversionScreen.currentDraftImages = List.from(imagesToOpen);
+
     _isConversionScreenOpen = true;
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ConversionScreen(initialImages: xFiles),
+        builder: (context) => ConversionScreen(initialImages: imagesToOpen),
       ),
     );
     _isConversionScreenOpen = false;

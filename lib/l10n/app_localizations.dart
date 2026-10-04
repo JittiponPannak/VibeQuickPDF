@@ -78,6 +78,17 @@ class AppLocalizations {
   // Conversion Screen - Image Grid Header & Confirmations
   String selectedImagesCount(int count) =>
       isThai ? 'รูปภาพที่เลือก ($count)' : 'Selected Images ($count)';
+  String get reorderHint => isThai
+      ? 'กดค้างแล้วลากเพื่อจัดลำดับหน้า'
+      : 'Press & drag to reorder pages';
+  String pageNumber(int index) =>
+      isThai ? 'หน้า $index' : 'Page $index';
+  String get movePrevious => isThai ? 'ย้ายไปก่อนหน้า' : 'Move Previous';
+  String get moveNext => isThai ? 'ย้ายไปถัดไป' : 'Move Next';
+  String get moveToFirst => isThai ? 'ย้ายไปหน้าแรกสุด' : 'Move to First';
+  String get moveToLast => isThai ? 'ย้ายไปหน้าท้ายสุด' : 'Move to Last';
+  String get reorderOptionsTitle =>
+      isThai ? 'จัดลำดับหน้า' : 'Reorder Page';
   String get clearAllConfirmTitle =>
       isThai ? 'ล้างรูปภาพทั้งหมด' : 'Clear All Images';
   String get clearAllConfirmMessage => isThai
@@ -114,12 +125,23 @@ class AppLocalizations {
       ? 'กำลังสร้าง PDF กรุณารอสักครู่...'
       : 'Generating PDF, please wait...';
 
-  // Conversion Screen - Shared Media Dialog
+  // Shared Media Application Dialog
   String get sharedMediaTitle =>
       isThai ? 'ได้รับรูปภาพที่แชร์มา' : 'Shared Images Received';
   String sharedMediaQuestion(int count) => isThai
       ? 'ต้องการจัดการรูปภาพ $count รูปที่ได้รับอย่างไร?'
       : 'How would you like to handle the $count shared images?';
+  String get appendCurrentList =>
+      isThai ? 'เพิ่มต่อท้ายรายการเดิม' : 'Append to current list';
+  String get appendCurrentListSubtitle => isThai
+      ? 'เพิ่มรูปภาพต่อท้ายรายการรูปภาพเดิมที่มีอยู่'
+      : 'Add these images to the end of the current list';
+  String get createNewListFirst => isThai
+      ? 'สร้างรายการใหม่ (แทรกเป็นรูปแรก)'
+      : 'Create new list (insert as first element)';
+  String get createNewListFirstSubtitle => isThai
+      ? 'เริ่มรายการใหม่โดยวางรูปภาพนี้เป็นลำดับแรก'
+      : 'Start a fresh list with these images as the first elements';
   String get replaceExisting => isThai ? 'แทนที่รูปเดิม' : 'Replace existing';
   String get appendToEnd => isThai ? 'เพิ่มต่อท้าย' : 'Append to list';
 
@@ -128,8 +150,8 @@ class AppLocalizations {
       ? 'เพิ่มรูปภาพ $count รูปเรียบร้อยแล้ว'
       : 'Added $count images successfully';
   String imagesReplacedSuccess(int count) => isThai
-      ? 'แทนที่รูปภาพด้วย $count รูปใหม่แล้ว'
-      : 'Replaced with $count new images';
+      ? 'สร้างรายการใหม่ด้วย $count รูปภาพแล้ว'
+      : 'Created new list with $count images';
   String cannotPickImages(dynamic e) =>
       isThai ? 'ไม่สามารถเลือกรูปภาพได้: $e' : 'Unable to select images: $e';
   String cannotOpenCamera(dynamic e) =>

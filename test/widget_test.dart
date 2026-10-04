@@ -13,6 +13,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:vibe_quick_pdf/l10n/app_localizations.dart';
 import 'package:vibe_quick_pdf/main.dart';
 import 'package:vibe_quick_pdf/screens/conversion_screen.dart';
+import 'package:vibe_quick_pdf/widgets/shared_media_dialog.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -163,5 +164,112 @@ void main() {
     expect(find.text('ถ่ายรูป'), findsOneWidget);
     expect(find.text('เลือกจากคลัง'), findsOneWidget);
     expect(find.text('Quick PDF'), findsOneWidget);
+  });
+
+  testWidgets('ConversionScreen supports image reordering and shows reorder hint and page badges', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final testImages = [
+      XFile('image_1.png'),
+      XFile('image_2.png'),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: ConversionScreen(initialImages: testImages),
+      ),
+    );
+    await tester.pump();
+
+    // Verify reorder hint and page number badges
+    expect(find.text('Press & drag to reorder pages'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+
+    // Verify Draggable items exist
+    expect(find.byType(LongPressDraggable<int>), findsNWidgets(2));
+    expect(find.byType(DragTarget<int>), findsNWidgets(3));
+
+    // Tap on first image to open reorder modal
+    await tester.tap(find.text('1'));
+    await tester.pumpAndSettle();
+
+    // Verify reorder modal options appear
+    expect(find.text('Move Next'), findsOneWidget);
+    expect(find.text('Move to Last'), findsOneWidget);
+
+    // Tap Move Next
+    await tester.tap(find.text('Move Next'));
+    await tester.pumpAndSettle();
+
+    // Verify modal dismissed and images still present
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+  });
+
+  testWidgets('showSharedMediaApplicationDialog displays application dialog with append and create-new options', (
+    WidgetTester tester,
+  ) async {
+    SharedMediaAction? chosenAction;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: ElevatedButton(
+              onPressed: () async {
+                chosenAction = await showSharedMediaApplicationDialog(
+                  context: context,
+                  count: 3,
+                );
+              },
+              child: const Text('Open Dialog'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Open Dialog'));
+    await tester.pumpAndSettle();
+
+    // Verify application dialog contents
+    expect(find.text('Shared Images Received'), findsOneWidget);
+    expect(find.text('Append to current list'), findsOneWidget);
+    expect(
+      find.text('Create new list (insert as first element)'),
+      findsOneWidget,
+    );
+    expect(find.text('Cancel'), findsOneWidget);
+
+    // Tap Append to current list
+    await tester.tap(find.text('Append to current list'));
+    await tester.pumpAndSettle();
+
+    expect(chosenAction, SharedMediaAction.append);
   });
 }
