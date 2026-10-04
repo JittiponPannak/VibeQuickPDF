@@ -24,7 +24,8 @@ class FileService {
     try {
       final List<FileSystemEntity> entities = directory.listSync();
       for (var entity in entities) {
-        if (entity is File && entity.path.endsWith('.pdf')) {
+        if (entity is File &&
+            (entity.path.endsWith('.pdf') || entity.path.endsWith('.zip'))) {
           final stat = await entity.stat();
           files.add(
             PdfFile(
@@ -46,14 +47,26 @@ class FileService {
     return files;
   }
 
-  Future<String> savePdf(String fileName, List<int> bytes) async {
+  Future<String> savePdf(String fileName, List<int> bytes) =>
+      saveFile(fileName, 'pdf', bytes);
+
+  Future<String> saveZip(String fileName, List<int> bytes) =>
+      saveFile(fileName, 'zip', bytes);
+
+  Future<String> saveFile(
+    String fileName,
+    String extension,
+    List<int> bytes,
+  ) async {
     final path = await _localPath;
-    String fullPath = '$path/$fileName.pdf';
+    final cleanExt =
+        extension.startsWith('.') ? extension.substring(1) : extension;
+    String fullPath = '$path/$fileName.$cleanExt';
 
     // Check if file exists, append number if it does
     int counter = 1;
     while (await File(fullPath).exists()) {
-      fullPath = '$path/${fileName}_$counter.pdf';
+      fullPath = '$path/${fileName}_$counter.$cleanExt';
       counter++;
     }
 
@@ -72,16 +85,18 @@ class FileService {
     return result.status == ShareResultStatus.success;
   }
 
-  /// Shares PDF bytes via the system share sheet using a temporary file.
-  /// No permanent file is saved on the device.
-  Future<bool> sharePdfBytes(
+  /// Shares file bytes via the system share sheet using a temporary file.
+  Future<bool> shareBytes(
     List<int> bytes,
     String displayName, {
+    String extension = 'pdf',
     String? shareText,
   }) async {
     final tempDir = await getTemporaryDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final tempFile = File('${tempDir.path}/${displayName}_$timestamp.pdf');
+    final cleanExt =
+        extension.startsWith('.') ? extension.substring(1) : extension;
+    final tempFile = File('${tempDir.path}/${displayName}_$timestamp.$cleanExt');
     await tempFile.writeAsBytes(bytes);
     final result = await SharePlus.instance.share(
       ShareParams(
@@ -92,17 +107,28 @@ class FileService {
     return result.status == ShareResultStatus.success;
   }
 
-  /// Shares multiple PDF byte lists via the system share sheet using temporary files.
-  /// No permanent file is saved on the device.
-  Future<bool> shareMultiplePdfBytes(
+  /// Shares PDF bytes via the system share sheet using a temporary file.
+  Future<bool> sharePdfBytes(
+    List<int> bytes,
+    String displayName, {
+    String? shareText,
+  }) =>
+      shareBytes(bytes, displayName, extension: 'pdf', shareText: shareText);
+
+  /// Shares multiple byte lists via the system share sheet using temporary files.
+  Future<bool> shareMultipleBytes(
     List<MapEntry<String, List<int>>> files, {
+    String extension = 'pdf',
     String? shareText,
   }) async {
     final tempDir = await getTemporaryDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final cleanExt =
+        extension.startsWith('.') ? extension.substring(1) : extension;
     final xFiles = <XFile>[];
     for (var entry in files) {
-      final tempFile = File('${tempDir.path}/${entry.key}_$timestamp.pdf');
+      final tempFile =
+          File('${tempDir.path}/${entry.key}_$timestamp.$cleanExt');
       await tempFile.writeAsBytes(entry.value);
       xFiles.add(XFile(tempFile.path));
     }
@@ -114,6 +140,13 @@ class FileService {
     );
     return result.status == ShareResultStatus.success;
   }
+
+  /// Shares multiple PDF byte lists via the system share sheet using temporary files.
+  Future<bool> shareMultiplePdfBytes(
+    List<MapEntry<String, List<int>>> files, {
+    String? shareText,
+  }) =>
+      shareMultipleBytes(files, extension: 'pdf', shareText: shareText);
 
   Future<void> openPdf(String path) async {
     final result = await OpenFilex.open(path);

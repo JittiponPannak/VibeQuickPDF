@@ -97,6 +97,10 @@ class AppLocalizations {
 
   // Conversion Screen - Settings
   String get fileNameLabel => isThai ? 'ชื่อไฟล์ PDF' : 'PDF File Name';
+  String get zipFileNameLabel => isThai ? 'ชื่อไฟล์ ZIP' : 'ZIP File Name';
+  String get exportFormatLabel => isThai ? 'รูปแบบไฟล์ส่งออก' : 'Export Format';
+  String get exportFormatPdf => 'PDF';
+  String get exportFormatZip => 'ZIP';
   String get defaultFileName => isThai ? 'เอกสาร' : 'Document';
   String get mergeSingleTitle =>
       isThai ? 'รวมเป็น PDF ไฟล์เดียว' : 'Merge into single PDF';
@@ -114,6 +118,22 @@ class AppLocalizations {
       : (isThai
           ? 'แต่ละรูปภาพจะถูกแยกเป็น PDF คนละไฟล์'
           : 'Each image will be saved as an individual PDF');
+  String get mergeSingleZipTitle =>
+      isThai ? 'รวมเป็น ZIP ไฟล์เดียว' : 'Merge into single ZIP';
+  String mergeSingleZipSubtitle(int count) => count > 0
+      ? (isThai
+          ? 'รวมรูปภาพ $count รูปไว้ใน 1 ไฟล์ ZIP เดียว'
+          : 'Combine $count images into 1 ZIP archive')
+      : (isThai
+          ? 'รูปภาพทั้งหมดจะรวมอยู่ในไฟล์ ZIP เดียว'
+          : 'All images will be merged into a single ZIP');
+  String splitZipSubtitle(int count) => count > 0
+      ? (isThai
+          ? 'แยกสร้าง $count ไฟล์ ZIP (1 ไฟล์ต่อ 1 รูปภาพ)'
+          : 'Create $count separate ZIP files (1 file per image)')
+      : (isThai
+          ? 'แต่ละรูปภาพจะถูกแยกเป็น ZIP คนละไฟล์'
+          : 'Each image will be saved as an individual ZIP');
   String get quickPdfTitle => 'Quick PDF';
   String get quickPdfSubtitle => isThai
       ? 'สร้างและแชร์ PDF ทันทีหลังจากเลือกรูปภาพ'
@@ -124,6 +144,9 @@ class AppLocalizations {
   String get generatingPdfWait => isThai
       ? 'กำลังสร้าง PDF กรุณารอสักครู่...'
       : 'Generating PDF, please wait...';
+  String get generatingZipWait => isThai
+      ? 'กำลังสร้าง ZIP กรุณารอสักครู่...'
+      : 'Generating ZIP, please wait...';
 
   // Shared Media Application Dialog
   String get sharedMediaTitle =>
@@ -152,6 +175,12 @@ class AppLocalizations {
   String imagesReplacedSuccess(int count) => isThai
       ? 'สร้างรายการใหม่ด้วย $count รูปภาพแล้ว'
       : 'Created new list with $count images';
+  String get extractingArchive => isThai
+      ? 'กำลังแตกไฟล์และดึงรูปภาพ...'
+      : 'Extracting images from archive...';
+  String get noImagesInArchive => isThai
+      ? 'ไม่พบรูปภาพในไฟล์บีบอัด'
+      : 'No images found in the archive';
   String cannotPickImages(dynamic e) =>
       isThai ? 'ไม่สามารถเลือกรูปภาพได้: $e' : 'Unable to select images: $e';
   String cannotOpenCamera(dynamic e) =>
@@ -161,10 +190,16 @@ class AppLocalizations {
       : 'Please select at least one image';
   String get pdfCreatedSuccess =>
       isThai ? 'สร้าง PDF สำเร็จแล้ว!' : 'PDF created successfully!';
+  String get zipCreatedSuccess =>
+      isThai ? 'สร้าง ZIP สำเร็จแล้ว!' : 'ZIP created successfully!';
   String get pdfSharedSuccess =>
       isThai ? 'แชร์ PDF สำเร็จแล้ว!' : 'PDF shared successfully!';
+  String get zipSharedSuccess =>
+      isThai ? 'แชร์ ZIP สำเร็จแล้ว!' : 'ZIP shared successfully!';
   String cannotCreatePdf(dynamic e) =>
       isThai ? 'ไม่สามารถสร้าง PDF ได้: $e' : 'Failed to create PDF: $e';
+  String cannotCreateZip(dynamic e) =>
+      isThai ? 'ไม่สามารถสร้าง ZIP ได้: $e' : 'Failed to create ZIP: $e';
   String errorOccurred(dynamic e) =>
       isThai ? 'เกิดข้อผิดพลาด: $e' : 'An error occurred: $e';
 }

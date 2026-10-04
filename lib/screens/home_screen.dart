@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../l10n/app_localizations.dart';
 import '../models/pdf_file.dart';
 import '../services/file_service.dart';
+import '../services/archive_service.dart';
 import '../widgets/shared_media_dialog.dart';
 
 import 'conversion_screen.dart';
@@ -72,13 +73,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _handleSharedMedia(List<SharedFile> sharedFiles) async {
     if (_isConversionScreenOpen) return;
-    final imageFiles = sharedFiles
-        .where((f) => f.type == SharedMediaType.IMAGE)
-        .toList();
-    if (imageFiles.isEmpty) return;
 
-    final xFiles = imageFiles.map((f) => XFile(f.value!)).toList();
+    final validPaths = sharedFiles
+        .map((f) => f.value)
+        .where((val) => val != null && val.isNotEmpty)
+        .cast<String>()
+        .toList();
+    if (validPaths.isEmpty) return;
+
     FlutterSharingIntent.instance.reset();
+
+    final archiveService = ArchiveService();
+    final xFiles = await archiveService.resolveImagesFromSharedPaths(validPaths);
+
+    if (xFiles.isEmpty) {
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.noImagesInArchive)),
+        );
+      }
+      return;
+    }
 
     if (!mounted) return;
 
@@ -297,9 +313,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   elevation: 2,
                   child: ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: Colors.redAccent,
-                      child: Icon(Icons.picture_as_pdf, color: Colors.white),
+                    leading: CircleAvatar(
+                      backgroundColor: file.path.toLowerCase().endsWith('.zip')
+                          ? Colors.amber.shade700
+                          : Colors.redAccent,
+                      child: Icon(
+                        file.path.toLowerCase().endsWith('.zip')
+                            ? Icons.folder_zip
+                            : Icons.picture_as_pdf,
+                        color: Colors.white,
+                      ),
                     ),
                     title: Text(
                       file.name,

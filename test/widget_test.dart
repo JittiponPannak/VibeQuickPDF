@@ -272,4 +272,45 @@ void main() {
 
     expect(chosenAction, SharedMediaAction.append);
   });
+
+  testWidgets('ConversionScreen displays Export Format dropdown above merge option and switches between PDF and ZIP', (
+    WidgetTester tester,
+  ) async {
+    final testImages = [XFile('test_image.png')];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: ConversionScreen(initialImages: testImages),
+      ),
+    );
+    await tester.pump();
+
+    // Verify initial state: PDF is selected by default
+    expect(find.text('Export Format'), findsOneWidget);
+    expect(find.text('PDF'), findsWidgets);
+    expect(find.text('Merge into single PDF'), findsOneWidget);
+
+    // Open dropdown
+    await tester.tap(find.text('PDF').first);
+    await tester.pumpAndSettle();
+
+    // Verify dropdown items
+    expect(find.text('ZIP').last, findsOneWidget);
+
+    // Select ZIP
+    await tester.tap(find.text('ZIP').last);
+    await tester.pumpAndSettle();
+
+    // Verify UI dynamically updated for ZIP export
+    expect(find.text('Merge into single ZIP'), findsOneWidget);
+    expect(find.text('ZIP File Name'), findsOneWidget);
+  });
 }

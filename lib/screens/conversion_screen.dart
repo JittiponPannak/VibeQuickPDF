@@ -7,6 +7,7 @@ import 'package:flutter_sharing_intent/model/sharing_file.dart';
 import '../l10n/app_localizations.dart';
 import '../services/pdf_service.dart';
 import '../services/file_service.dart';
+import '../services/archive_service.dart';
 import '../widgets/shared_media_dialog.dart';
 
 class ConversionScreen extends StatefulWidget {
@@ -23,9 +24,11 @@ class _ConversionScreenState extends State<ConversionScreen> {
   final ImagePicker _picker = ImagePicker();
   final PdfService _pdfService = PdfService();
   final FileService _fileService = FileService();
+  final ArchiveService _archiveService = ArchiveService();
 
   final List<XFile> _selectedImages = [];
   bool _isGenerating = false;
+  String _exportType = 'PDF';
   bool _mergeIntoSingle = true;
   bool _quickPdf = false;
   late StreamSubscription _intentMediaStreamSubscription;
@@ -64,13 +67,27 @@ class _ConversionScreenState extends State<ConversionScreen> {
   }
 
   void _handleSharedMedia(List<SharedFile> sharedFiles) async {
-    final imageFiles = sharedFiles
-        .where((f) => f.type == SharedMediaType.IMAGE)
+    final validPaths = sharedFiles
+        .map((f) => f.value)
+        .where((val) => val != null && val.isNotEmpty)
+        .cast<String>()
         .toList();
-    if (imageFiles.isEmpty) return;
+    if (validPaths.isEmpty) return;
 
-    final xFiles = imageFiles.map((f) => XFile(f.value!)).toList();
     FlutterSharingIntent.instance.reset(); // clear it
+
+    final xFiles =
+        await _archiveService.resolveImagesFromSharedPaths(validPaths);
+
+    if (xFiles.isEmpty) {
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.noImagesInArchive)),
+        );
+      }
+      return;
+    }
 
     if (!mounted) return;
     final l10n = AppLocalizations.of(context);
@@ -352,66 +369,139 @@ class _ConversionScreenState extends State<ConversionScreen> {
     });
 
     try {
-      if (share) {
-        bool success = false;
-        if (_mergeIntoSingle) {
-          final paths = _selectedImages.map((e) => e.path).toList();
-          final pdfBytes = await _pdfService.createPdfFromImages(paths);
-          success = await _fileService.sharePdfBytes(
-            pdfBytes,
-            fileName,
-            shareText: l10n.shareWatermark,
-          );
-        } else {
-          final files = <MapEntry<String, List<int>>>[];
-          for (int i = 0; i < _selectedImages.length; i++) {
-            final pdfBytes = await _pdfService.createPdfFromImage(
-              _selectedImages[i].path,
+      if (_exportType == 'PDF') {
+        if (share) {
+          bool success = false;
+          if (_mergeIntoSingle) {
+            final paths = _selectedImages.map((e) => e.path).toList();
+            final pdfBytes = await _pdfService.createPdfFromImages(paths);
+            success = await _fileService.sharePdfBytes(
+              pdfBytes,
+              fileName,
+              shareText: l10n.shareWatermark,
             );
-            final suffix = _selectedImages.length > 1 ? '_${i + 1}' : '';
-            files.add(MapEntry('$fileName$suffix', pdfBytes));
+          } else {
+            final files = <MapEntry<String, List<int>>>[];
+            for (int i = 0; i < _selectedImages.length; i++) {
+              final pdfBytes = await _pdfService.createPdfFromImage(
+                _selectedImages[i].path,
+              );
+              final suffix = _selectedImages.length > 1 ? '_${i + 1}' : '';
+              files.add(MapEntry('$fileName$suffix', pdfBytes));
+            }
+            success = await _fileService.shareMultiplePdfBytes(
+              files,
+              shareText: l10n.shareWatermark,
+            );
           }
-          success = await _fileService.shareMultiplePdfBytes(
-            files,
-            shareText: l10n.shareWatermark,
-          );
-        }
 
-        if (mounted) {
-          if (!success) {
-            _showRetryShareDialog(() => _generatePdf(share: true));
+          if (mounted) {
+            if (!success) {
+              _showRetryShareDialog(() => _generatePdf(share: true));
+            }
+          }
+        } else {
+          if (_mergeIntoSingle) {
+            // Generate single PDF with all images
+            final paths = _selectedImages.map((e) => e.path).toList();
+            final pdfBytes = await _pdfService.createPdfFromImages(paths);
+            await _fileService.savePdf(fileName, pdfBytes);
+          } else {
+            // Generate one PDF per image
+            for (int i = 0; i < _selectedImages.length; i++) {
+              final pdfBytes = await _pdfService.createPdfFromImage(
+                _selectedImages[i].path,
+              );
+              final suffix = _selectedImages.length > 1 ? '_${i + 1}' : '';
+              await _fileService.savePdf('$fileName$suffix', pdfBytes);
+            }
+          }
+
+          if (mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(l10n.pdfCreatedSuccess)));
+            Navigator.pop(
+              context,
+              true,
+            ); // Return true to indicate success and trigger reload
           }
         }
       } else {
-        if (_mergeIntoSingle) {
-          // Generate single PDF with all images
-          final paths = _selectedImages.map((e) => e.path).toList();
-          final pdfBytes = await _pdfService.createPdfFromImages(paths);
-          await _fileService.savePdf(fileName, pdfBytes);
-        } else {
-          // Generate one PDF per image
-          for (int i = 0; i < _selectedImages.length; i++) {
-            final pdfBytes = await _pdfService.createPdfFromImage(
-              _selectedImages[i].path,
+        // Export as ZIP
+        if (share) {
+          bool success = false;
+          if (_mergeIntoSingle) {
+            final paths = _selectedImages.map((e) => e.path).toList();
+            final zipBytes = await _archiveService.createZipFromImages(
+              paths,
+              baseFileName: fileName,
             );
-            final suffix = _selectedImages.length > 1 ? '_${i + 1}' : '';
-            await _fileService.savePdf('$fileName$suffix', pdfBytes);
+            success = await _fileService.shareBytes(
+              zipBytes,
+              fileName,
+              extension: 'zip',
+              shareText: l10n.shareWatermark,
+            );
+          } else {
+            final files = <MapEntry<String, List<int>>>[];
+            for (int i = 0; i < _selectedImages.length; i++) {
+              final suffix = _selectedImages.length > 1 ? '_${i + 1}' : '';
+              final zipBytes = await _archiveService.createZipFromImage(
+                _selectedImages[i].path,
+                baseFileName: '$fileName$suffix',
+              );
+              files.add(MapEntry('$fileName$suffix', zipBytes));
+            }
+            success = await _fileService.shareMultipleBytes(
+              files,
+              extension: 'zip',
+              shareText: l10n.shareWatermark,
+            );
           }
-        }
 
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(l10n.pdfCreatedSuccess)));
-          Navigator.pop(
-            context,
-            true,
-          ); // Return true to indicate success and trigger reload
+          if (mounted) {
+            if (!success) {
+              _showRetryShareDialog(() => _generatePdf(share: true));
+            }
+          }
+        } else {
+          if (_mergeIntoSingle) {
+            final paths = _selectedImages.map((e) => e.path).toList();
+            final zipBytes = await _archiveService.createZipFromImages(
+              paths,
+              baseFileName: fileName,
+            );
+            await _fileService.saveZip(fileName, zipBytes);
+          } else {
+            for (int i = 0; i < _selectedImages.length; i++) {
+              final suffix = _selectedImages.length > 1 ? '_${i + 1}' : '';
+              final zipBytes = await _archiveService.createZipFromImage(
+                _selectedImages[i].path,
+                baseFileName: '$fileName$suffix',
+              );
+              await _fileService.saveZip('$fileName$suffix', zipBytes);
+            }
+          }
+
+          if (mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(l10n.zipCreatedSuccess)));
+            Navigator.pop(
+              context,
+              true,
+            ); // Return true to indicate success and trigger reload
+          }
         }
       }
     } catch (e) {
       if (mounted) {
-        _showError(l10n.cannotCreatePdf(e));
+        _showError(
+          _exportType == 'PDF'
+              ? l10n.cannotCreatePdf(e)
+              : l10n.cannotCreateZip(e),
+        );
       }
     } finally {
       if (mounted) {
@@ -503,6 +593,8 @@ class _ConversionScreenState extends State<ConversionScreen> {
 
   Widget _buildSettingsSection() {
     final l10n = AppLocalizations.of(context);
+    final isZip = _exportType == 'ZIP';
+
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       elevation: 0,
@@ -518,11 +610,13 @@ class _ConversionScreenState extends State<ConversionScreen> {
             TextField(
               controller: _fileNameController,
               decoration: InputDecoration(
-                labelText: l10n.fileNameLabel,
+                labelText: isZip ? l10n.zipFileNameLabel : l10n.fileNameLabel,
                 hintText: l10n.defaultFileName,
                 isDense: true,
                 border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.description),
+                prefixIcon: Icon(
+                  isZip ? Icons.folder_zip_outlined : Icons.description,
+                ),
                 suffixIcon: _fileNameController.text.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 20),
@@ -535,20 +629,54 @@ class _ConversionScreenState extends State<ConversionScreen> {
               ),
               onChanged: (_) => setState(() {}),
             ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _exportType,
+              decoration: InputDecoration(
+                labelText: l10n.exportFormatLabel,
+                isDense: true,
+                border: const OutlineInputBorder(),
+                prefixIcon: Icon(
+                  isZip ? Icons.folder_zip : Icons.picture_as_pdf,
+                  color: isZip ? Colors.amber.shade800 : Colors.redAccent,
+                ),
+              ),
+              items: const [
+                DropdownMenuItem<String>(
+                  value: 'PDF',
+                  child: Text('PDF'),
+                ),
+                DropdownMenuItem<String>(
+                  value: 'ZIP',
+                  child: Text('ZIP'),
+                ),
+              ],
+              onChanged: (String? value) {
+                if (value != null && value != _exportType) {
+                  setState(() {
+                    _exportType = value;
+                  });
+                }
+              },
+            ),
             const SizedBox(height: 8),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(
-                l10n.mergeSingleTitle,
+                isZip ? l10n.mergeSingleZipTitle : l10n.mergeSingleTitle,
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
                 ),
               ),
               subtitle: Text(
-                _mergeIntoSingle
-                    ? l10n.mergeSingleSubtitle(_selectedImages.length)
-                    : l10n.splitSubtitle(_selectedImages.length),
+                isZip
+                    ? (_mergeIntoSingle
+                        ? l10n.mergeSingleZipSubtitle(_selectedImages.length)
+                        : l10n.splitZipSubtitle(_selectedImages.length))
+                    : (_mergeIntoSingle
+                        ? l10n.mergeSingleSubtitle(_selectedImages.length)
+                        : l10n.splitSubtitle(_selectedImages.length)),
                 style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
               ),
               value: _mergeIntoSingle,
@@ -1024,7 +1152,11 @@ class _ConversionScreenState extends State<ConversionScreen> {
                 children: [
                   const CircularProgressIndicator(),
                   const SizedBox(height: 16),
-                  Text(l10n.generatingPdfWait),
+                  Text(
+                    _exportType == 'PDF'
+                        ? l10n.generatingPdfWait
+                        : l10n.generatingZipWait,
+                  ),
                 ],
               ),
             )

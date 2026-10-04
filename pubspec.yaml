@@ -45,6 +45,7 @@ dependencies:
   flutter_sharing_intent: ^2.0.4
   path: ^1.9.1
   package_info_plus: ^10.2.1
+  archive: ^4.3.0
 
 dev_dependencies:
   flutter_test:
