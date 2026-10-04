@@ -10,7 +10,6 @@ import '../services/pdf_service.dart';
 import '../services/file_service.dart';
 import '../services/archive_service.dart';
 import '../widgets/shared_media_dialog.dart';
-import '../widgets/theme_toggle_button.dart';
 
 class ConversionScreen extends StatefulWidget {
   final List<XFile>? initialImages;
@@ -34,7 +33,6 @@ class _ConversionScreenState extends State<ConversionScreen> {
   File? _tempPreviewFile;
   String _exportType = 'PDF';
   bool _mergeIntoSingle = true;
-  bool _quickPdf = false;
   late StreamSubscription _intentMediaStreamSubscription;
 
   final TextEditingController _fileNameController = TextEditingController();
@@ -115,9 +113,6 @@ class _ConversionScreenState extends State<ConversionScreen> {
             content: Text(l10n.imagesAddedSuccess(xFiles.length)),
           ),
         );
-        if (_quickPdf) {
-          _generatePdf(share: true);
-        }
       }
     } else if (action == SharedMediaAction.createNew) {
       setState(() {
@@ -134,9 +129,6 @@ class _ConversionScreenState extends State<ConversionScreen> {
             ),
           ),
         );
-        if (_quickPdf) {
-          _generatePdf(share: true);
-        }
       }
     }
   }
@@ -148,9 +140,6 @@ class _ConversionScreenState extends State<ConversionScreen> {
         setState(() {
           _selectedImages.addAll(images);
         });
-        if (_quickPdf && mounted) {
-          _generatePdf(share: true);
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -166,9 +155,6 @@ class _ConversionScreenState extends State<ConversionScreen> {
         setState(() {
           _selectedImages.add(image);
         });
-        if (_quickPdf && mounted) {
-          _generatePdf(share: true);
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -850,39 +836,6 @@ class _ConversionScreenState extends State<ConversionScreen> {
                 });
               },
             ),
-            const Divider(height: 1),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Row(
-                children: [
-                  const Icon(Icons.bolt, color: Colors.amber, size: 20),
-                  const SizedBox(width: 6),
-                  Text(
-                    l10n.quickPdfTitle,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                ],
-              ),
-              subtitle: Text(
-                l10n.quickPdfSubtitle,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
-                ),
-              ),
-              value: _quickPdf,
-              onChanged: (value) {
-                setState(() {
-                  _quickPdf = value;
-                });
-                if (_quickPdf && _selectedImages.isNotEmpty) {
-                  _generatePdf(share: true);
-                }
-              },
-            ),
           ],
         ),
       ),
@@ -1309,7 +1262,6 @@ class _ConversionScreenState extends State<ConversionScreen> {
       appBar: AppBar(
         title: Text(l10n.createPdf),
         actions: [
-          const ThemeToggleButton(),
           if (_selectedImages.isNotEmpty) ...[
             IconButton(
               icon: const Icon(Icons.visibility_outlined),

@@ -10,7 +10,7 @@ import '../models/pdf_file.dart';
 import '../services/file_service.dart';
 import '../services/archive_service.dart';
 import '../widgets/shared_media_dialog.dart';
-import '../widgets/theme_toggle_button.dart';
+import '../main.dart';
 
 import 'conversion_screen.dart';
 
@@ -211,75 +211,124 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(12.0),
           child: Image.asset('assets/icon.png'),
         ),
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(l10n.appTitle),
-            if (_version.isNotEmpty)
-              Text(
-                'v$_version',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.normal,
+        flexibleSpace: SafeArea(
+          bottom: false,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.appTitle,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
-              ),
-          ],
-        ),
-        centerTitle: true,
-        actions: [
-          const ThemeToggleButton(),
-          PopupMenuButton<Locale?>(
-            icon: const Icon(Icons.language),
-            tooltip: l10n.changeLanguage,
-            onSelected: (Locale? locale) {
-              appLocaleNotifier.value = locale;
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: null,
-                child: Row(
-                  children: [
-                    if (appLocaleNotifier.value == null)
-                      const Icon(Icons.check, size: 18)
-                    else
-                      const SizedBox(width: 18),
-                    const SizedBox(width: 8),
-                    Text(l10n.languageSystem),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: const Locale('th'),
-                child: Row(
-                  children: [
-                    if (appLocaleNotifier.value?.languageCode == 'th')
-                      const Icon(Icons.check, size: 18)
-                    else
-                      const SizedBox(width: 18),
-                    const SizedBox(width: 8),
-                    Text(l10n.languageThai),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: const Locale('en'),
-                child: Row(
-                  children: [
-                    if (appLocaleNotifier.value?.languageCode == 'en')
-                      const Icon(Icons.check, size: 18)
-                    else
-                      const SizedBox(width: 18),
-                    const SizedBox(width: 8),
-                    Text(l10n.languageEnglish),
-                  ],
-                ),
-              ),
-            ],
+                if (_version.isNotEmpty)
+                  Text(
+                    'v$_version',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.normal,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                    ),
+                  ),
+              ],
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: l10n.refresh,
-            onPressed: _loadFiles,
+        ),
+        actionsPadding: const EdgeInsets.only(right: 4),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: l10n.isThai ? 'ตัวเลือก' : 'Menu',
+            onSelected: (String value) {
+              if (value == 'refresh') {
+                _loadFiles();
+              } else if (value == 'theme') {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                appThemeModeNotifier.value =
+                    isDark ? ThemeMode.light : ThemeMode.dark;
+              } else if (value == 'lang_system') {
+                appLocaleNotifier.value = null;
+              } else if (value == 'lang_th') {
+                appLocaleNotifier.value = const Locale('th');
+              } else if (value == 'lang_en') {
+                appLocaleNotifier.value = const Locale('en');
+              }
+            },
+            itemBuilder: (BuildContext context) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return [
+                PopupMenuItem<String>(
+                  value: 'refresh',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.refresh, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(l10n.refresh)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'theme',
+                  child: Row(
+                    children: [
+                      Icon(
+                        isDark ? Icons.light_mode : Icons.dark_mode,
+                        size: 20,
+                        color: isDark ? Colors.amber : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(isDark ? l10n.themeLight : l10n.themeDark),
+                      ),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem<String>(
+                  value: 'lang_system',
+                  child: Row(
+                    children: [
+                      if (appLocaleNotifier.value == null)
+                        const Icon(Icons.check, size: 18)
+                      else
+                        const SizedBox(width: 18),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(l10n.languageSystem)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'lang_th',
+                  child: Row(
+                    children: [
+                      if (appLocaleNotifier.value?.languageCode == 'th')
+                        const Icon(Icons.check, size: 18)
+                      else
+                        const SizedBox(width: 18),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(l10n.languageThai)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'lang_en',
+                  child: Row(
+                    children: [
+                      if (appLocaleNotifier.value?.languageCode == 'en')
+                        const Icon(Icons.check, size: 18)
+                      else
+                        const SizedBox(width: 18),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(l10n.languageEnglish)),
+                    ],
+                  ),
+                ),
+              ];
+            },
           ),
         ],
       ),

@@ -14,6 +14,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:vibe_quick_pdf/l10n/app_localizations.dart';
 import 'package:vibe_quick_pdf/main.dart';
 import 'package:vibe_quick_pdf/screens/conversion_screen.dart';
+import 'package:vibe_quick_pdf/screens/home_screen.dart';
 import 'package:vibe_quick_pdf/widgets/shared_media_dialog.dart';
 
 void main() {
@@ -154,8 +155,8 @@ void main() {
     // Verifies no duplicate buttons on empty screen
     expect(find.text('Camera'), findsOneWidget);
     expect(find.text('Gallery'), findsOneWidget);
-    // Verifies Quick PDF setting switch exists
-    expect(find.text('Quick PDF'), findsOneWidget);
+    // Verifies Quick PDF setting switch is removed
+    expect(find.text('Quick PDF'), findsNothing);
 
     // Thai test
     await tester.pumpWidget(
@@ -177,7 +178,7 @@ void main() {
     // Verifies no duplicate buttons on empty screen in Thai
     expect(find.text('ถ่ายรูป'), findsOneWidget);
     expect(find.text('เลือกจากคลัง'), findsOneWidget);
-    expect(find.text('Quick PDF'), findsOneWidget);
+    expect(find.text('Quick PDF'), findsNothing);
   });
 
   testWidgets('ConversionScreen supports image reordering and shows reorder hint and page badges', (
@@ -331,7 +332,8 @@ void main() {
   testWidgets('ConversionScreen creates and shows temp preview and deletes it when closed', (
     WidgetTester tester,
   ) async {
-    final img = File('preview_test_image.png');
+    final tempDir = Directory.systemTemp.createTempSync('vibe_test_');
+    final img = File('${tempDir.path}/preview_test_image.png');
     // Minimal valid 1x1 PNG bytes
     await img.writeAsBytes([
       137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
@@ -381,39 +383,19 @@ void main() {
         find.text('Preview closed and temporary file deleted'),
         findsOneWidget,
       );
+
+      // Wait for snackbar duration to finish cleanly
+      await tester.pump(const Duration(seconds: 3));
     } finally {
-      if (await img.exists()) await img.delete();
+      if (tempDir.existsSync()) {
+        try {
+          tempDir.deleteSync(recursive: true);
+        } catch (_) {}
+      }
     }
   });
 
-  testWidgets('HomeScreen has ThemeToggleButton and toggles between light and dark mode', (
-    WidgetTester tester,
-  ) async {
-    appThemeModeNotifier.value = ThemeMode.light;
-
-    await tester.pumpWidget(const VibeQuickPdfApp());
-    await tester.pumpAndSettle();
-
-    // In light mode, icon is dark_mode (indicating tap to switch to dark)
-    expect(find.byIcon(Icons.dark_mode), findsOneWidget);
-
-    // Tap theme toggle button
-    await tester.tap(find.byIcon(Icons.dark_mode));
-    await tester.pumpAndSettle();
-
-    // Now theme mode is dark
-    expect(appThemeModeNotifier.value, ThemeMode.dark);
-    expect(find.byIcon(Icons.light_mode), findsOneWidget);
-
-    // Tap again to switch back
-    await tester.tap(find.byIcon(Icons.light_mode));
-    await tester.pumpAndSettle();
-
-    expect(appThemeModeNotifier.value, ThemeMode.light);
-    expect(find.byIcon(Icons.dark_mode), findsOneWidget);
-  });
-
-  testWidgets('ConversionScreen has ThemeToggleButton and toggles theme mode', (
+  testWidgets('HomeScreen has dropdown menu with refresh, theme toggle, and language choices', (
     WidgetTester tester,
   ) async {
     appThemeModeNotifier.value = ThemeMode.light;
@@ -433,20 +415,110 @@ void main() {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: const ConversionScreen(),
+          home: const HomeScreen(),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    // Button exists on empty ConversionScreen
-    expect(find.byIcon(Icons.dark_mode), findsOneWidget);
+    // The single dropdown menu button is present
+    expect(find.byIcon(Icons.more_vert), findsOneWidget);
 
-    // Tap toggle button
-    await tester.tap(find.byIcon(Icons.dark_mode));
-    await tester.pumpAndSettle();
+    // Open dropdown menu
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
+    // Verify all 3 functions' choices are present in the dropdown
+    expect(find.text('Refresh'), findsOneWidget);
+    expect(find.text('Switch to Dark Mode'), findsOneWidget);
+    expect(find.text('System Default'), findsOneWidget);
+    expect(find.text('ภาษาไทย (Thai)'), findsOneWidget);
+    expect(find.text('English'), findsOneWidget);
+
+    // Tap theme toggle in dropdown
+    await tester.tap(find.text('Switch to Dark Mode'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Now theme mode is dark
     expect(appThemeModeNotifier.value, ThemeMode.dark);
-    expect(find.byIcon(Icons.light_mode), findsOneWidget);
+
+    // Open dropdown menu again
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Switch to Light Mode'), findsOneWidget);
+
+    // Tap again to switch back
+    await tester.tap(find.text('Switch to Light Mode'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(appThemeModeNotifier.value, ThemeMode.light);
+  });
+
+  testWidgets('ConversionScreen does not have theme change button', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        locale: Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: ConversionScreen(),
+      ),
+    );
+    await tester.pump();
+
+    // Verify theme toggle is removed from ConversionScreen
+    expect(find.byIcon(Icons.dark_mode), findsNothing);
+    expect(find.byIcon(Icons.light_mode), findsNothing);
+  });
+
+  testWidgets('HomeScreen title is centered on the screen regardless of actions width', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 2.0; // Logical size: 400 x 800
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        locale: Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: HomeScreen(),
+      ),
+    );
+    await tester.pump();
+
+    final titleFinder = find.text('VibeQuickPDF');
+    expect(titleFinder, findsOneWidget);
+
+    final titleCenter = tester.getCenter(titleFinder);
+    // On a 400 logical px wide screen, the center X must be exactly 200.0
+    expect(titleCenter.dx, equals(200.0));
+
+    // Test on a narrow screen (360 logical px width)
+    tester.view.physicalSize = const Size(720, 1600); // 360 x 800 logical
+    await tester.pump();
+    final narrowTitleCenter = tester.getCenter(titleFinder);
+    expect(narrowTitleCenter.dx, equals(180.0));
   });
 }

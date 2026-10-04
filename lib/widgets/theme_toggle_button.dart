@@ -3,7 +3,8 @@ import '../l10n/app_localizations.dart';
 import '../main.dart';
 
 class ThemeToggleButton extends StatelessWidget {
-  const ThemeToggleButton({super.key});
+  final VisualDensity? visualDensity;
+  const ThemeToggleButton({super.key, this.visualDensity});
 
   @override
   Widget build(BuildContext context) {
@@ -11,6 +12,7 @@ class ThemeToggleButton extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     return IconButton(
+      visualDensity: visualDensity,
       icon: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         transitionBuilder: (child, animation) {
