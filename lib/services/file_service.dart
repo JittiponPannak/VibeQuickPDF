@@ -53,6 +53,15 @@ class FileService {
   Future<String> saveZip(String fileName, List<int> bytes) =>
       saveFile(fileName, 'zip', bytes);
 
+  /// Creates a temporary PDF file for previewing.
+  Future<File> createTempPdf(String fileName, List<int> bytes) async {
+    final tempDir = await getTemporaryDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final file = File('${tempDir.path}/${fileName}_preview_$timestamp.pdf');
+    await file.writeAsBytes(bytes);
+    return file;
+  }
+
   Future<String> saveFile(
     String fileName,
     String extension,

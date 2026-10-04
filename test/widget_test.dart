@@ -5,6 +5,7 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -40,6 +41,17 @@ void main() {
           const MethodChannel('plugins.flutter.io/path_provider'),
           (MethodCall methodCall) async {
             return '.';
+          },
+        );
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('open_filex'),
+          (MethodCall methodCall) async {
+            return {
+              'type': 0,
+              'message': 'done',
+            };
           },
         );
   });
@@ -94,6 +106,7 @@ void main() {
     );
     await tester.pump();
 
+    expect(find.text('ดูตัวอย่าง'), findsOneWidget);
     expect(find.text('บันทึกในเครื่อง'), findsOneWidget);
     expect(find.text('แชร์'), findsOneWidget);
 
@@ -113,6 +126,7 @@ void main() {
     );
     await tester.pump();
 
+    expect(find.text('Preview'), findsOneWidget);
     expect(find.text('Save to Device'), findsOneWidget);
     expect(find.text('Share'), findsOneWidget);
   });
@@ -312,5 +326,127 @@ void main() {
     // Verify UI dynamically updated for ZIP export
     expect(find.text('Merge into single ZIP'), findsOneWidget);
     expect(find.text('ZIP File Name'), findsOneWidget);
+  });
+
+  testWidgets('ConversionScreen creates and shows temp preview and deletes it when closed', (
+    WidgetTester tester,
+  ) async {
+    final img = File('preview_test_image.png');
+    // Minimal valid 1x1 PNG bytes
+    await img.writeAsBytes([
+      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
+      0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196,
+      137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0,
+      5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174,
+      66, 96, 130
+    ]);
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: ConversionScreen(initialImages: [XFile(img.path)]),
+        ),
+      );
+      await tester.pump();
+
+      // Tap Preview button
+      await tester.tap(find.text('Preview'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+
+      // Verify bottom sheet modal is open
+      expect(find.text('PDF Preview'), findsOneWidget);
+      expect(
+        find.text('Temporary preview active. File will be deleted when closed.'),
+        findsOneWidget,
+      );
+      expect(find.text('Close Preview'), findsOneWidget);
+
+      // Tap Close Preview
+      await tester.tap(find.text('Close Preview'));
+      await tester.pumpAndSettle();
+
+      // Verify sheet is closed and deletion snackbar appears
+      expect(find.text('PDF Preview'), findsNothing);
+      expect(
+        find.text('Preview closed and temporary file deleted'),
+        findsOneWidget,
+      );
+    } finally {
+      if (await img.exists()) await img.delete();
+    }
+  });
+
+  testWidgets('HomeScreen has ThemeToggleButton and toggles between light and dark mode', (
+    WidgetTester tester,
+  ) async {
+    appThemeModeNotifier.value = ThemeMode.light;
+
+    await tester.pumpWidget(const VibeQuickPdfApp());
+    await tester.pumpAndSettle();
+
+    // In light mode, icon is dark_mode (indicating tap to switch to dark)
+    expect(find.byIcon(Icons.dark_mode), findsOneWidget);
+
+    // Tap theme toggle button
+    await tester.tap(find.byIcon(Icons.dark_mode));
+    await tester.pumpAndSettle();
+
+    // Now theme mode is dark
+    expect(appThemeModeNotifier.value, ThemeMode.dark);
+    expect(find.byIcon(Icons.light_mode), findsOneWidget);
+
+    // Tap again to switch back
+    await tester.tap(find.byIcon(Icons.light_mode));
+    await tester.pumpAndSettle();
+
+    expect(appThemeModeNotifier.value, ThemeMode.light);
+    expect(find.byIcon(Icons.dark_mode), findsOneWidget);
+  });
+
+  testWidgets('ConversionScreen has ThemeToggleButton and toggles theme mode', (
+    WidgetTester tester,
+  ) async {
+    appThemeModeNotifier.value = ThemeMode.light;
+
+    await tester.pumpWidget(
+      ListenableBuilder(
+        listenable: appThemeModeNotifier,
+        builder: (context, _) => MaterialApp(
+          theme: ThemeData.light(),
+          darkTheme: ThemeData.dark(),
+          themeMode: appThemeModeNotifier.value,
+          locale: const Locale('en'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: const ConversionScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Button exists on empty ConversionScreen
+    expect(find.byIcon(Icons.dark_mode), findsOneWidget);
+
+    // Tap toggle button
+    await tester.tap(find.byIcon(Icons.dark_mode));
+    await tester.pumpAndSettle();
+
+    expect(appThemeModeNotifier.value, ThemeMode.dark);
+    expect(find.byIcon(Icons.light_mode), findsOneWidget);
   });
 }

@@ -38,6 +38,10 @@ class AppLocalizations {
   String get languageThai => 'ภาษาไทย (Thai)';
   String get languageEnglish => 'English';
   String get languageSystem => isThai ? 'ตามระบบ' : 'System Default';
+  String get themeLight =>
+      isThai ? 'เปลี่ยนเป็นโหมดสว่าง' : 'Switch to Light Mode';
+  String get themeDark => isThai ? 'เปลี่ยนเป็นโหมดมืด' : 'Switch to Dark Mode';
+  String get themeSystem => isThai ? 'ตามระบบ' : 'System Default';
 
   // Home Screen
   String get emptyPdfListMessage => isThai
@@ -140,6 +144,16 @@ class AppLocalizations {
       : 'Automatically create and share PDF immediately after picking images';
 
   // Conversion Screen - Actions
+  String get previewPdf => isThai ? 'ดูตัวอย่าง' : 'Preview';
+  String get previewPdfTitle => isThai ? 'ดูตัวอย่าง PDF' : 'PDF Preview';
+  String get previewTempNotice => isThai
+      ? 'กำลังเปิดดูตัวอย่างไฟล์ชั่วคราว ไฟล์จะถูกลบเมื่อปิด'
+      : 'Temporary preview active. File will be deleted when closed.';
+  String get closePreview => isThai ? 'ปิดตัวอย่าง' : 'Close Preview';
+  String get reopenPreview => isThai ? 'เปิดดูอีกครั้ง' : 'Re-open';
+  String get previewClosedCleaned => isThai
+      ? 'ปิดการดูตัวอย่างและลบไฟล์ชั่วคราวแล้ว'
+      : 'Preview closed and temporary file deleted';
   String get saveToDisk => isThai ? 'บันทึกในเครื่อง' : 'Save to Device';
   String get generatingPdfWait => isThai
       ? 'กำลังสร้าง PDF กรุณารอสักครู่...'
@@ -147,6 +161,9 @@ class AppLocalizations {
   String get generatingZipWait => isThai
       ? 'กำลังสร้าง ZIP กรุณารอสักครู่...'
       : 'Generating ZIP, please wait...';
+  String get preparingPreviewWait => isThai
+      ? 'กำลังเตรียมไฟล์ตัวอย่าง...'
+      : 'Preparing preview...';
 
   // Shared Media Application Dialog
   String get sharedMediaTitle =>

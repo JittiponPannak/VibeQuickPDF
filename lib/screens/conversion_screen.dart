@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_sharing_intent/flutter_sharing_intent.dart';
 import 'package:flutter_sharing_intent/model/sharing_file.dart';
+import 'package:open_filex/open_filex.dart';
 import '../l10n/app_localizations.dart';
 import '../services/pdf_service.dart';
 import '../services/file_service.dart';
 import '../services/archive_service.dart';
 import '../widgets/shared_media_dialog.dart';
+import '../widgets/theme_toggle_button.dart';
 
 class ConversionScreen extends StatefulWidget {
   final List<XFile>? initialImages;
@@ -28,6 +30,8 @@ class _ConversionScreenState extends State<ConversionScreen> {
 
   final List<XFile> _selectedImages = [];
   bool _isGenerating = false;
+  bool _isPreviewGenerating = false;
+  File? _tempPreviewFile;
   String _exportType = 'PDF';
   bool _mergeIntoSingle = true;
   bool _quickPdf = false;
@@ -61,6 +65,7 @@ class _ConversionScreenState extends State<ConversionScreen> {
 
   @override
   void dispose() {
+    _cleanupTempPreviewFile();
     _intentMediaStreamSubscription.cancel();
     _fileNameController.dispose();
     super.dispose();
@@ -512,6 +517,157 @@ class _ConversionScreenState extends State<ConversionScreen> {
     }
   }
 
+  Future<void> _cleanupTempPreviewFile() async {
+    final file = _tempPreviewFile;
+    _tempPreviewFile = null;
+    if (file != null) {
+      try {
+        if (await file.exists()) {
+          await file.delete();
+          debugPrint("Temporary preview file deleted: ${file.path}");
+        }
+      } catch (e) {
+        debugPrint("Error deleting temp preview file: $e");
+      }
+    }
+  }
+
+  Future<void> _previewPdf() async {
+    final l10n = AppLocalizations.of(context);
+    if (_selectedImages.isEmpty) {
+      _showError(l10n.selectAtLeastOneImage);
+      return;
+    }
+
+    final fileName = _fileNameController.text.trim().isEmpty
+        ? l10n.defaultFileName
+        : _fileNameController.text.trim();
+
+    setState(() {
+      _isGenerating = true;
+      _isPreviewGenerating = true;
+    });
+
+    try {
+      // Clean up previous temp preview file if any
+      await _cleanupTempPreviewFile();
+
+      final paths = _selectedImages.map((e) => e.path).toList();
+      final pdfBytes = await _pdfService.createPdfFromImages(paths);
+      final tempFile = await _fileService.createTempPdf(fileName, pdfBytes);
+      _tempPreviewFile = tempFile;
+
+      final openResult = await OpenFilex.open(tempFile.path);
+      if (openResult.type != ResultType.done) {
+        debugPrint("OpenFilex preview result: ${openResult.message}");
+      }
+
+      if (mounted) {
+        _showPreviewModal(tempFile);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError(l10n.cannotCreatePdf(e));
+      }
+      await _cleanupTempPreviewFile();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGenerating = false;
+          _isPreviewGenerating = false;
+        });
+      }
+    }
+  }
+
+  void _showPreviewModal(File tempFile) {
+    final l10n = AppLocalizations.of(context);
+    showModalBottomSheet(
+      context: context,
+      isDismissible: true,
+      enableDrag: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.picture_as_pdf,
+                    color: Colors.redAccent,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.previewPdfTitle,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          l10n.previewTempNotice,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        if (_tempPreviewFile != null) {
+                          OpenFilex.open(_tempPreviewFile!.path);
+                        }
+                      },
+                      icon: const Icon(Icons.open_in_new, size: 18),
+                      label: Text(l10n.reopenPreview),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      icon: const Icon(Icons.close, size: 18),
+                      label: Text(l10n.closePreview),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).whenComplete(() async {
+      await _cleanupTempPreviewFile();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.previewClosedCleaned),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    });
+  }
+
   void _showAddImageModal() {
     final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
@@ -594,13 +750,18 @@ class _ConversionScreenState extends State<ConversionScreen> {
   Widget _buildSettingsSection() {
     final l10n = AppLocalizations.of(context);
     final isZip = _exportType == 'ZIP';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade300),
+        side: BorderSide(
+          color: isDark
+              ? Theme.of(context).colorScheme.outlineVariant
+              : Colors.grey.shade300,
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -677,7 +838,10 @@ class _ConversionScreenState extends State<ConversionScreen> {
                     : (_mergeIntoSingle
                         ? l10n.mergeSingleSubtitle(_selectedImages.length)
                         : l10n.splitSubtitle(_selectedImages.length)),
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                ),
               ),
               value: _mergeIntoSingle,
               onChanged: (value) {
@@ -704,7 +868,10 @@ class _ConversionScreenState extends State<ConversionScreen> {
               ),
               subtitle: Text(
                 l10n.quickPdfSubtitle,
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                ),
               ),
               value: _quickPdf,
               onChanged: (value) {
@@ -724,6 +891,7 @@ class _ConversionScreenState extends State<ConversionScreen> {
 
   Widget _buildEmptyState() {
     final l10n = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -753,7 +921,10 @@ class _ConversionScreenState extends State<ConversionScreen> {
             const SizedBox(height: 8),
             Text(
               l10n.emptyStateHubSubtitle,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+              style: TextStyle(
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                fontSize: 14,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -900,11 +1071,19 @@ class _ConversionScreenState extends State<ConversionScreen> {
                         child: Container(
                           decoration: BoxDecoration(
                             border: Border.all(
-                              color: Colors.grey.shade400,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Theme.of(context).colorScheme.outlineVariant
+                                  : Colors.grey.shade400,
                               width: 1.5,
                             ),
                             borderRadius: BorderRadius.circular(12),
-                            color: Colors.grey.shade100,
+                            color: Theme.of(context).brightness ==
+                                    Brightness.dark
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHigh
+                                : Colors.grey.shade100,
                           ),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -1000,7 +1179,11 @@ class _ConversionScreenState extends State<ConversionScreen> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          color: Colors.grey.shade300,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest
+                              : Colors.grey.shade300,
                           child: const Center(
                             child: Icon(
                               Icons.swap_horiz,
@@ -1126,7 +1309,13 @@ class _ConversionScreenState extends State<ConversionScreen> {
       appBar: AppBar(
         title: Text(l10n.createPdf),
         actions: [
+          const ThemeToggleButton(),
           if (_selectedImages.isNotEmpty) ...[
+            IconButton(
+              icon: const Icon(Icons.visibility_outlined),
+              onPressed: _isGenerating ? null : _previewPdf,
+              tooltip: l10n.previewPdf,
+            ),
             IconButton(
               icon: const Icon(Icons.delete_sweep_outlined),
               onPressed: _confirmClearAll,
@@ -1153,9 +1342,11 @@ class _ConversionScreenState extends State<ConversionScreen> {
                   const CircularProgressIndicator(),
                   const SizedBox(height: 16),
                   Text(
-                    _exportType == 'PDF'
-                        ? l10n.generatingPdfWait
-                        : l10n.generatingZipWait,
+                    _isPreviewGenerating
+                        ? l10n.preparingPreviewWait
+                        : (_exportType == 'PDF'
+                            ? l10n.generatingPdfWait
+                            : l10n.generatingZipWait),
                   ),
                 ],
               ),
@@ -1166,7 +1357,7 @@ class _ConversionScreenState extends State<ConversionScreen> {
                 const Divider(height: 1),
                 Expanded(
                   child: _selectedImages.isEmpty
-                      ? _buildEmptyState()
+                       ? _buildEmptyState()
                       : _buildImagesGrid(),
                 ),
               ],
@@ -1175,52 +1366,78 @@ class _ConversionScreenState extends State<ConversionScreen> {
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 56,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _generatePdf(share: false),
-                          icon: const Icon(Icons.save_alt, size: 22),
-                          label: Text(
-                            l10n.saveToDisk,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        onPressed: _isGenerating ? null : _previewPdf,
+                        icon: const Icon(Icons.visibility_outlined, size: 20),
+                        label: Text(
+                          l10n.previewPdf,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
                           ),
-                          style: ElevatedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SizedBox(
-                        height: 56,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _generatePdf(share: true),
-                          icon: const Icon(Icons.share, size: 22),
-                          label: Text(
-                            l10n.share,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.amber.shade700,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 56,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _generatePdf(share: false),
+                              icon: const Icon(Icons.save_alt, size: 22),
+                              label: Text(
+                                l10n.saveToDisk,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 56,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _generatePdf(share: true),
+                              icon: const Icon(Icons.share, size: 22),
+                              label: Text(
+                                l10n.share,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.amber.shade700,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

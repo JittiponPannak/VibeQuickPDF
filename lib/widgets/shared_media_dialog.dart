@@ -12,6 +12,7 @@ Future<SharedMediaAction?> showSharedMediaApplicationDialog({
 }) {
   final l10n = AppLocalizations.of(context);
   final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
 
   return showModalBottomSheet<SharedMediaAction>(
     context: context,
@@ -28,17 +29,17 @@ Future<SharedMediaAction?> showSharedMediaApplicationDialog({
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -100,12 +101,16 @@ Future<SharedMediaAction?> showSharedMediaApplicationDialog({
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.teal.shade50,
+                        color: isDark
+                            ? Colors.teal.shade900.withAlpha(120)
+                            : Colors.teal.shade50,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.playlist_add,
-                        color: Colors.teal.shade700,
+                        color: isDark
+                            ? Colors.teal.shade300
+                            : Colors.teal.shade700,
                         size: 22,
                       ),
                     ),
@@ -126,13 +131,18 @@ Future<SharedMediaAction?> showSharedMediaApplicationDialog({
                             l10n.appendCurrentListSubtitle,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade600,
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right, color: Colors.grey),
+                    Icon(
+                      Icons.chevron_right,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey,
+                    ),
                   ],
                 ),
               ),
@@ -184,7 +194,9 @@ Future<SharedMediaAction?> showSharedMediaApplicationDialog({
                             l10n.createNewListFirstSubtitle,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade600,
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                           ),
                         ],
@@ -204,7 +216,7 @@ Future<SharedMediaAction?> showSharedMediaApplicationDialog({
                 child: Text(
                   l10n.cancel,
                   style: TextStyle(
-                    color: Colors.grey.shade700,
+                    color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

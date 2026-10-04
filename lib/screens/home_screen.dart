@@ -10,6 +10,7 @@ import '../models/pdf_file.dart';
 import '../services/file_service.dart';
 import '../services/archive_service.dart';
 import '../widgets/shared_media_dialog.dart';
+import '../widgets/theme_toggle_button.dart';
 
 import 'conversion_screen.dart';
 
@@ -226,6 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         centerTitle: true,
         actions: [
+          const ThemeToggleButton(),
           PopupMenuButton<Locale?>(
             icon: const Icon(Icons.language),
             tooltip: l10n.changeLanguage,
@@ -291,13 +293,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   Icon(
                     Icons.picture_as_pdf,
                     size: 64,
-                    color: Colors.grey.shade400,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade600
+                        : Colors.grey.shade400,
                   ),
                   const SizedBox(height: 16),
                   Text(
                     l10n.emptyPdfListMessage,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                      fontSize: 16,
+                    ),
                   ),
                 ],
               ),
