@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:open_filex/open_filex.dart';
@@ -39,7 +40,7 @@ class FileService {
       // Sort by newest first
       files.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     } catch (e) {
-      print("Error reading directory: $e");
+      debugPrint("Error reading directory: $e");
     }
 
     return files;
@@ -61,16 +62,23 @@ class FileService {
     return fullPath;
   }
 
-  Future<bool> sharePdf(String path) async {
+  Future<bool> sharePdf(String path, {String? shareText}) async {
     final result = await SharePlus.instance.share(
-      ShareParams(files: [XFile(path)], text: 'สร้างด้วย VibeQuickPDF'),
+      ShareParams(
+        files: [XFile(path)],
+        text: shareText ?? 'สร้างด้วย VibeQuickPDF',
+      ),
     );
     return result.status == ShareResultStatus.success;
   }
 
   /// Shares PDF bytes via the system share sheet using a temporary file.
   /// No permanent file is saved on the device.
-  Future<bool> sharePdfBytes(List<int> bytes, String displayName) async {
+  Future<bool> sharePdfBytes(
+    List<int> bytes,
+    String displayName, {
+    String? shareText,
+  }) async {
     final tempDir = await getTemporaryDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final tempFile = File('${tempDir.path}/${displayName}_$timestamp.pdf');
@@ -78,7 +86,30 @@ class FileService {
     final result = await SharePlus.instance.share(
       ShareParams(
         files: [XFile(tempFile.path)],
-        text: 'สร้างด้วย VibeQuickPDF',
+        text: shareText ?? 'สร้างด้วย VibeQuickPDF',
+      ),
+    );
+    return result.status == ShareResultStatus.success;
+  }
+
+  /// Shares multiple PDF byte lists via the system share sheet using temporary files.
+  /// No permanent file is saved on the device.
+  Future<bool> shareMultiplePdfBytes(
+    List<MapEntry<String, List<int>>> files, {
+    String? shareText,
+  }) async {
+    final tempDir = await getTemporaryDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final xFiles = <XFile>[];
+    for (var entry in files) {
+      final tempFile = File('${tempDir.path}/${entry.key}_$timestamp.pdf');
+      await tempFile.writeAsBytes(entry.value);
+      xFiles.add(XFile(tempFile.path));
+    }
+    final result = await SharePlus.instance.share(
+      ShareParams(
+        files: xFiles,
+        text: shareText ?? 'สร้างด้วย VibeQuickPDF',
       ),
     );
     return result.status == ShareResultStatus.success;
@@ -87,7 +118,7 @@ class FileService {
   Future<void> openPdf(String path) async {
     final result = await OpenFilex.open(path);
     if (result.type != ResultType.done) {
-      print("Error opening file: ${result.message}");
+      debugPrint("Error opening file: ${result.message}");
     }
   }
 
@@ -98,7 +129,7 @@ class FileService {
         await file.delete();
       }
     } catch (e) {
-      print("Error deleting file: $e");
+      debugPrint("Error deleting file: $e");
     }
   }
 }

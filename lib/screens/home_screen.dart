@@ -5,9 +5,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_sharing_intent/flutter_sharing_intent.dart';
 import 'package:flutter_sharing_intent/model/sharing_file.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../l10n/app_localizations.dart';
 import '../models/pdf_file.dart';
 import '../services/file_service.dart';
-import '../services/pdf_service.dart';
+
 import 'conversion_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -19,7 +20,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final FileService _fileService = FileService();
-  final PdfService _pdfService = PdfService();
   List<PdfFile> _pdfFiles = [];
   bool _isLoading = true;
   bool _isConversionScreenOpen = false;
@@ -79,43 +79,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final xFiles = imageFiles.map((f) => XFile(f.value!)).toList();
     FlutterSharingIntent.instance.reset();
 
-    if (!mounted) return;
-
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('เลือกรูปแบบการสร้าง PDF'),
-        content: const Text(
-          'คุณได้รับรูปภาพที่แชร์มา คุณต้องการสร้าง PDF แบบใด?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'normal'),
-            child: const Text('สร้างปกติ'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'quick'),
-            child: const Text('Quick PDF'),
-          ),
-        ],
+    _isConversionScreenOpen = true;
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ConversionScreen(initialImages: xFiles),
       ),
     );
-
-    if (choice == 'normal') {
-      if (!mounted) return;
-      _isConversionScreenOpen = true;
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ConversionScreen(initialImages: xFiles),
-        ),
-      );
-      _isConversionScreenOpen = false;
-      if (result == true) {
-        _loadFiles();
-      }
-    } else if (choice == 'quick') {
-      await _processQuickExport(xFiles);
+    _isConversionScreenOpen = false;
+    if (result == true) {
+      _loadFiles();
     }
   }
 
@@ -143,15 +116,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _confirmDelete(PdfFile file) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('ลบ PDF'),
-        content: Text('คุณแน่ใจหรือไม่ว่าต้องการลบ ${file.name}?'),
+        title: Text(l10n.deletePdfTitle),
+        content: Text(l10n.deletePdfConfirm(file.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('ยกเลิก'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -160,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _loadFiles();
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('ลบ'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -168,103 +142,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showRetryShareDialog(Future<void> Function() onRetry) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('การแชร์ไม่สำเร็จ'),
-        content: const Text(
-          'ดูเหมือนว่าการแชร์จะไม่สมบูรณ์ คุณต้องการลองอีกครั้งหรือไม่?',
-        ),
+        title: Text(l10n.shareFailedTitle),
+        content: Text(l10n.shareFailedMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('ยกเลิก'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               onRetry();
             },
-            child: const Text('ลองใหม่'),
+            child: Text(l10n.retry),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _processQuickExport(List<XFile> images) async {
-    try {
-      if (!mounted) return;
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
-
-      final paths = images.map((e) => e.path).toList();
-      final pdfBytes = await _pdfService.createPdfFromImages(paths);
-      final success = await _fileService.sharePdfBytes(pdfBytes, 'QuickPDF');
-      if (mounted) Navigator.pop(context); // dismiss loading
-
-      if (!success && mounted) {
-        _showRetryShareDialog(() => _processQuickExport(images));
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // dismiss loading if still showing
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
-      }
-    }
-  }
-
-  Future<void> _quickExport() async {
-    final picker = ImagePicker();
-    try {
-      final List<XFile> images = await picker.pickMultiImage();
-      if (images.isEmpty) return;
-      await _processQuickExport(images);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
-      }
-    }
-  }
-
-  Future<void> _captureFromCamera() async {
-    final picker = ImagePicker();
-    try {
-      final XFile? image = await picker.pickImage(source: ImageSource.camera);
-      if (image == null) return;
-
-      if (!mounted) return;
-
-      _isConversionScreenOpen = true;
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ConversionScreen(initialImages: [image]),
-        ),
-      );
-      _isConversionScreenOpen = false;
-      if (result == true) {
-        _loadFiles();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       appBar: AppBar(
         leading: Padding(
@@ -274,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('VibeQuickPDF'),
+            Text(l10n.appTitle),
             if (_version.isNotEmpty)
               Text(
                 'v$_version',
@@ -287,7 +191,59 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         centerTitle: true,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadFiles),
+          PopupMenuButton<Locale?>(
+            icon: const Icon(Icons.language),
+            tooltip: l10n.changeLanguage,
+            onSelected: (Locale? locale) {
+              appLocaleNotifier.value = locale;
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: null,
+                child: Row(
+                  children: [
+                    if (appLocaleNotifier.value == null)
+                      const Icon(Icons.check, size: 18)
+                    else
+                      const SizedBox(width: 18),
+                    const SizedBox(width: 8),
+                    Text(l10n.languageSystem),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: const Locale('th'),
+                child: Row(
+                  children: [
+                    if (appLocaleNotifier.value?.languageCode == 'th')
+                      const Icon(Icons.check, size: 18)
+                    else
+                      const SizedBox(width: 18),
+                    const SizedBox(width: 8),
+                    Text(l10n.languageThai),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: const Locale('en'),
+                child: Row(
+                  children: [
+                    if (appLocaleNotifier.value?.languageCode == 'en')
+                      const Icon(Icons.check, size: 18)
+                    else
+                      const SizedBox(width: 18),
+                    const SizedBox(width: 8),
+                    Text(l10n.languageEnglish),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: l10n.refresh,
+            onPressed: _loadFiles,
+          ),
         ],
       ),
       body: _isLoading
@@ -304,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'ยังไม่มี PDF ที่สร้างขึ้น\nแตะที่ปุ่มด้านล่างเพื่อสร้างใหม่!',
+                    l10n.emptyPdfListMessage,
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
                   ),
@@ -331,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(
-                      '${DateFormat('MMM d, yyyy HH:mm').format(file.createdAt)} • ${_formatSize(file.size)}',
+                      '${DateFormat('MMM d, yyyy HH:mm', l10n.locale.toString()).format(file.createdAt)} • ${_formatSize(file.size)}',
                     ),
                     onTap: () => _fileService.openPdf(file.path),
                     trailing: Row(
@@ -339,19 +295,25 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.share, color: Colors.blue),
+                          tooltip: l10n.share,
                           onPressed: () async {
                             final success = await _fileService.sharePdf(
                               file.path,
+                              shareText: l10n.shareWatermark,
                             );
                             if (!success && context.mounted) {
                               _showRetryShareDialog(
-                                () => _fileService.sharePdf(file.path),
+                                () => _fileService.sharePdf(
+                                  file.path,
+                                  shareText: l10n.shareWatermark,
+                                ),
                               );
                             }
                           },
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete, color: Colors.red),
+                          tooltip: l10n.delete,
                           onPressed: () => _confirmDelete(file),
                         ),
                       ],
@@ -363,76 +325,37 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 64,
-                height: 64,
-                child: ElevatedButton(
-                  onPressed: _captureFromCamera,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal.shade500,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+          child: SizedBox(
+            width: double.infinity,
+            height: 64,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                _isConversionScreenOpen = true;
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ConversionScreen(),
                   ),
-                  child: const Icon(Icons.camera_alt, size: 28),
+                );
+                _isConversionScreenOpen = false;
+                if (result == true) {
+                  _loadFiles();
+                }
+              },
+              icon: const Icon(Icons.add, size: 28),
+              label: Text(
+                l10n.createPdf,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SizedBox(
-                  height: 64,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      _isConversionScreenOpen = true;
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ConversionScreen(),
-                        ),
-                      );
-                      _isConversionScreenOpen = false;
-                      if (result == true) {
-                        _loadFiles();
-                      }
-                    },
-                    icon: const Icon(Icons.add, size: 28),
-                    label: const Text(
-                      'สร้าง PDF',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 64,
-                height: 64,
-                child: ElevatedButton(
-                  onPressed: _quickExport,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber.shade700,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Icon(Icons.bolt, size: 28),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
