@@ -22,15 +22,18 @@
 
 หน้าหลัก (ว่างปล่าว)          |  หน้าสร้างไฟล์ PDF
 :-------------------------:|:-------------------------:
-![Main Screen](/assets/examples/main_screen.png)  | ![Create Screen](/assets/examples/conversion_screen.png)
+![Main Screen](/assets/examples/home_0.png)  | ![Create Screen](/assets/examples/conv_0.png)
+![Main Screen](/assets/examples/home_1.png)  | ![Create Screen](/assets/examples/conv_1.png)
 
 ## คุณสมบัติ
 
-- การแปลงภาพเป็น PDF อย่างรวดเร็ว
-- ปุ่มส่งออกด่วน (Quick Export) สร้างและแชร์ PDF ทันทีโดยบันทึกแค่ชั่วคราวสำหรับการส่งไฟล์ และไม่เก็บถาวร
-- ตรวจสอบความสำเร็จของการแชร์ และมีระบบแจ้งเตือนให้ลองใหม่หากแชร์ไม่สำเร็จ
-- เลือกรองรับการรับรูปภาพที่แชร์มาจากแอปอื่น
-- แชร์ หรือบันทึกไฟล์ PDF ที่สร้างขึ้น
+- **แปลงไฟล์ได้อย่างรวดเร็ว**: แปลงชุดรูปภาพเป็นไฟล์ PDF หรือบีบอัดเป็นไฟล์ ZIP
+- **ตัวเลือกการส่งออกที่ยืดหยุ่น**: เลือกรวมไฟล์เป็นเอกสารฉบับเดียว (Merge) หรือแยกไฟล์ภาพแต่ละหน้าแยกชิ้น
+- **พรีวิวเอกสารก่อนส่งออก**: ดูตัวอย่างไฟล์ PDF ชั่วคราวได้ทันที พร้อมลบไฟล์ตัวอย่างอัตโนมัติเมื่อปิดหน้าจอพรีวิว
+- **รองรับการรับไฟล์แชร์จากแอปอื่น**: รับไฟล์รูปภาพ หรือแตกไฟล์รูปภาพจากไฟล์ Archive (เช่น `.zip`, `.tar.gz`) เพื่อนำเข้าสู่แอปได้โดยตรง พร้อมตัวเลือกแทนที่หรือต่อท้ายรายการเดิม
+- **จัดการและจัดเรียงหน้าได้ง่าย**: ปรับเปลี่ยนลำดับของภาพ (ลากวางหรือกดเลื่อนตำแหน่ง) ลบภาพรายหน้า หรือล้างรายการทั้งหมด
+- **ตรวจสอบสถานะการแชร์**: มีระบบตรวจจับและแจ้งเตือนให้ลองแชร์ใหม่หากกระบวนการแชร์ไม่สมบูรณ์
+- **รองรับ Dark Mode & สลับภาษา**: มีธีมโหมดมืด/สว่าง/ตามระบบ และรองรับการสลับภาษาทั้งไทยและอังกฤษ
 
 ## ความต้องการระบบ
 
@@ -49,9 +52,12 @@ flutter pub get
 
 ## โครงสร้างโปรเจกต์
 
-- [lib/main.dart](lib/main.dart): จุดเริ่มต้นของแอป
-- [lib/screens/home_screen.dart](lib/screens/home_screen.dart): UI หน้าแรกและการไหลหลัก
-- [lib/screens/conversion_screen.dart](lib/screens/conversion_screen.dart): หน้าเลือกภาพและแปลงเป็น PDF
-- [lib/services/file_service.dart](lib/services/file_service.dart): ฟังก์ชันช่วยจัดการไฟล์และการเข้าถึงที่เก็บ
-- [lib/services/pdf_service.dart](lib/services/pdf_service.dart): ตรรกะการสร้าง PDF
-- [lib/models/pdf_file.dart](lib/models/pdf_file.dart): โมเดลข้อมูลเมตาของ PDF
+- [lib/main.dart](lib/main.dart): จุดเริ่มต้นของแอป การกำหนด Theme และการรองรับ Localizations
+- [lib/screens/home_screen.dart](lib/screens/home_screen.dart): หน้าแรกแสดงรายการ PDF และเมนูการตั้งค่าธีม/ภาษา
+- [lib/screens/conversion_screen.dart](lib/screens/conversion_screen.dart): หน้าเลือกรูปภาพ จัดเรียง พรีวิว และส่งออกไฟล์เป็น PDF หรือ ZIP
+- [lib/services/file_service.dart](lib/services/file_service.dart): จัดการไฟล์ PDF ชั่วคราวและถาวร รวมถึงการแชร์ไฟล์
+- [lib/services/pdf_service.dart](lib/services/pdf_service.dart): ตรรกะการสร้างเอกสาร PDF
+- [lib/services/archive_service.dart](lib/services/archive_service.dart): จัดการสร้างไฟล์ ZIP และแตกไฟล์รูปภาพจากไฟล์ประเภท Archive
+- [lib/models/pdf_file.dart](lib/models/pdf_file.dart): โมเดลข้อมูลเมตาของไฟล์ PDF
+- [lib/widgets/shared_media_dialog.dart](lib/widgets/shared_media_dialog.dart): Dialog จัดการรูปภาพที่ได้รับจากการแชร์
+- [lib/l10n/app_localizations.dart](lib/l10n/app_localizations.dart): ระบบจัดการข้อความรองรับหลายภาษา (ไทย/อังกฤษ)
