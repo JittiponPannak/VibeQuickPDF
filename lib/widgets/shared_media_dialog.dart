@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 
-enum SharedMediaAction { append, createNew }
+enum SharedMediaAction { append, createNew, quickPdf }
 
 Future<SharedMediaAction?> showSharedMediaApplicationDialog({
   required BuildContext context,
@@ -208,6 +208,82 @@ Future<SharedMediaAction?> showSharedMediaApplicationDialog({
                       Icon(
                         Icons.chevron_right,
                         color: theme.colorScheme.primary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Option 3: Quickly create and share the PDF (Quick PDF)
+              InkWell(
+                onTap: () =>
+                    Navigator.pop(context, SharedMediaAction.quickPdf),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.amber.shade700.withAlpha(90),
+                    ),
+                    color: isDark
+                        ? Colors.amber.shade900.withAlpha(40)
+                        : Colors.amber.shade50.withAlpha(120),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.amber.shade900.withAlpha(120)
+                              : Colors.amber.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.bolt,
+                          color: isDark
+                              ? Colors.amber.shade300
+                              : Colors.amber.shade800,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.quickPdfShareTitle,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? Colors.amber.shade200
+                                    : Colors.amber.shade900,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              l10n.quickPdfShareSubtitle,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right,
+                        color: isDark
+                            ? Colors.amber.shade300
+                            : Colors.amber.shade800,
                       ),
                     ],
                   ),

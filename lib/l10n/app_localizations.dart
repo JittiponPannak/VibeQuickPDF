@@ -182,6 +182,11 @@ class AppLocalizations {
   String get createNewListFirstSubtitle => isThai
       ? 'เริ่มรายการใหม่โดยวางรูปภาพนี้เป็นลำดับแรก'
       : 'Start a fresh list with these images as the first elements';
+  String get quickPdfShareTitle =>
+      isThai ? 'สร้างและแชร์ PDF ทันที (Quick PDF)' : 'Quick PDF & Share';
+  String get quickPdfShareSubtitle => isThai
+      ? 'แปลงเป็น PDF และเปิดหน้าต่างแชร์ทันทีโดยไม่ต้องเข้าหน้าแก้ไข'
+      : 'Create and share PDF immediately without opening the editor';
   String get replaceExisting => isThai ? 'แทนที่รูปเดิม' : 'Replace existing';
   String get appendToEnd => isThai ? 'เพิ่มต่อท้าย' : 'Append to list';
 

@@ -130,6 +130,68 @@ class _ConversionScreenState extends State<ConversionScreen> {
           ),
         );
       }
+    } else if (action == SharedMediaAction.quickPdf) {
+      await _processQuickExport(xFiles);
+    }
+  }
+
+  Future<void> _processQuickExport(List<XFile> images) async {
+    final l10n = AppLocalizations.of(context);
+    bool dialogOpen = false;
+    try {
+      if (!mounted) return;
+
+      dialogOpen = true;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(
+          child: Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.generatingPdfWait,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ).then((_) => dialogOpen = false);
+
+      final paths = images.map((e) => e.path).toList();
+      final pdfBytes = await _pdfService.createPdfFromImages(paths);
+      final success = await _fileService.sharePdfBytes(
+        pdfBytes,
+        'QuickPDF',
+        shareText: l10n.shareWatermark,
+      );
+
+      if (dialogOpen && mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        dialogOpen = false;
+      }
+
+      if (!success && mounted) {
+        _showRetryShareDialog(() => _processQuickExport(images));
+      }
+    } catch (e) {
+      if (dialogOpen && mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        dialogOpen = false;
+      }
+      if (mounted) {
+        _showError(l10n.cannotCreatePdf(e));
+      }
     }
   }
 

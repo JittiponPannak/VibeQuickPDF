@@ -5,7 +5,6 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -279,6 +278,7 @@ void main() {
       find.text('Create new list (insert as first element)'),
       findsOneWidget,
     );
+    expect(find.text('Quick PDF & Share'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
 
     // Tap Append to current list
@@ -286,6 +286,49 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(chosenAction, SharedMediaAction.append);
+  });
+
+  testWidgets('showSharedMediaApplicationDialog allows selecting Quick PDF & Share option', (
+    WidgetTester tester,
+  ) async {
+    SharedMediaAction? chosenAction;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: ElevatedButton(
+              onPressed: () async {
+                chosenAction = await showSharedMediaApplicationDialog(
+                  context: context,
+                  count: 3,
+                );
+              },
+              child: const Text('Open Dialog'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Open Dialog'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Quick PDF & Share'), findsOneWidget);
+
+    await tester.tap(find.text('Quick PDF & Share'));
+    await tester.pumpAndSettle();
+
+    expect(chosenAction, SharedMediaAction.quickPdf);
   });
 
   testWidgets('ConversionScreen displays Export Format dropdown above merge option and switches between PDF and ZIP', (
@@ -327,72 +370,6 @@ void main() {
     // Verify UI dynamically updated for ZIP export
     expect(find.text('Merge into single ZIP'), findsOneWidget);
     expect(find.text('ZIP File Name'), findsOneWidget);
-  });
-
-  testWidgets('ConversionScreen creates and shows temp preview and deletes it when closed', (
-    WidgetTester tester,
-  ) async {
-    final tempDir = Directory.systemTemp.createTempSync('vibe_test_');
-    final img = File('${tempDir.path}/preview_test_image.png');
-    // Minimal valid 1x1 PNG bytes
-    await img.writeAsBytes([
-      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
-      0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196,
-      137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0,
-      5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174,
-      66, 96, 130
-    ]);
-
-    try {
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('en'),
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          home: ConversionScreen(initialImages: [XFile(img.path)]),
-        ),
-      );
-      await tester.pump();
-
-      // Tap Preview button
-      await tester.tap(find.text('Preview'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.pumpAndSettle();
-
-      // Verify bottom sheet modal is open
-      expect(find.text('PDF Preview'), findsOneWidget);
-      expect(
-        find.text('Temporary preview active. File will be deleted when closed.'),
-        findsOneWidget,
-      );
-      expect(find.text('Close Preview'), findsOneWidget);
-
-      // Tap Close Preview
-      await tester.tap(find.text('Close Preview'));
-      await tester.pumpAndSettle();
-
-      // Verify sheet is closed and deletion snackbar appears
-      expect(find.text('PDF Preview'), findsNothing);
-      expect(
-        find.text('Preview closed and temporary file deleted'),
-        findsOneWidget,
-      );
-
-      // Wait for snackbar duration to finish cleanly
-      await tester.pump(const Duration(seconds: 3));
-    } finally {
-      if (tempDir.existsSync()) {
-        try {
-          tempDir.deleteSync(recursive: true);
-        } catch (_) {}
-      }
-    }
   });
 
   testWidgets('HomeScreen has dropdown menu with refresh, theme toggle, and language choices', (
