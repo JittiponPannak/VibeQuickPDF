@@ -48,10 +48,35 @@ class AppLocalizations {
       ? 'ยังไม่มี PDF ที่สร้างขึ้น\nแตะที่ปุ่มด้านล่างเพื่อสร้างใหม่!'
       : 'No PDFs created yet\nTap the button below to create one!';
   String get createPdf => isThai ? 'สร้าง PDF' : 'Create PDF';
+  String get importPdfFromFile =>
+      isThai ? 'นำเข้า PDF จากไฟล์' : 'Import PDF From File';
+  String get importedBadge => isThai ? 'นำเข้า' : 'Imported';
+  String get pdfImportedSuccess =>
+      isThai ? 'นำเข้าไฟล์ PDF เข้าสู่รายการแล้ว' : 'PDF imported to list';
+  String get pdfAlreadyRegistered => isThai
+      ? 'ไฟล์ PDF นี้อยู่ในรายการแล้ว'
+      : 'This PDF is already in the list';
+  String get importPdfUnsupported => isThai
+      ? 'ไม่รองรับการนำเข้าไฟล์ PDF บนแพลตฟอร์มนี้'
+      : 'Importing PDF files is not supported on this platform';
+  String cannotImportPdf(dynamic e) =>
+      isThai ? 'ไม่สามารถนำเข้าไฟล์ PDF ได้: $e' : 'Unable to import PDF: $e';
   String get deletePdfTitle => isThai ? 'ลบ PDF' : 'Delete PDF';
   String deletePdfConfirm(String name) => isThai
       ? 'คุณแน่ใจหรือไม่ว่าต้องการลบ $name?'
       : 'Are you sure you want to delete $name?';
+  String get deleteImportedPdfTitle =>
+      isThai ? 'จัดการ PDF ที่นำเข้า' : 'Remove Imported PDF';
+  String deleteImportedPdfConfirm(String name) => isThai
+      ? 'คุณต้องการนำ "$name" ออกจากรายการเท่านั้น หรือลบไฟล์ออกจากเครื่องด้วย?'
+      : 'Do you want to remove "$name" from the list only, or also delete the file from your device?';
+  String get removeFromListOnly =>
+      isThai ? 'นำออกจากรายการ' : 'Remove from List';
+  String get deleteFileFromDevice =>
+      isThai ? 'ลบไฟล์ออกจากเครื่อง' : 'Delete File';
+  String get cannotDeleteFile => isThai
+      ? 'ไม่สามารถลบไฟล์ต้นฉบับได้ (อาจเป็นไฟล์แบบอ่านอย่างเดียว)'
+      : 'Unable to delete the original file (it may be read-only)';
   String get shareFailedTitle => isThai ? 'การแชร์ไม่สำเร็จ' : 'Share Failed';
   String get shareFailedMessage => isThai
       ? 'ดูเหมือนว่าการแชร์จะไม่สมบูรณ์ คุณต้องการลองอีกครั้งหรือไม่?'

@@ -30,6 +30,8 @@
 - **แปลงไฟล์ได้อย่างรวดเร็ว**: แปลงชุดรูปภาพเป็นไฟล์ PDF หรือบีบอัดเป็นไฟล์ ZIP
 - **สร้างและแชร์ทันที (Quick PDF & Share)**: เมื่อรับรูปภาพจากแหล่งอื่น สามารถเลือกแปลงเป็น PDF และเปิดหน้าต่างแชร์ได้ทันทีในคลิกเดียวโดยไม่ต้องเข้าหน้าแก้ไขเอกสาร
 - **ตัวเลือกการส่งออกที่ยืดหยุ่น**: เลือกรวมไฟล์เป็นเอกสารฉบับเดียว (Merge) หรือแยกไฟล์ภาพแต่ละหน้าแยกชิ้น
+- **บันทึกลงโฟลเดอร์ Documents/VibeQuickPDF/**: ไฟล์ PDF และ ZIP ที่บันทึกในเครื่องจะถูกจัดเก็บไว้ในโฟลเดอร์ `Documents/VibeQuickPDF/` เพื่อให้ง่ายต่อการค้นหาและเปิดดูจากตัวจัดการไฟล์ภายนอก
+- **ระบบ Registry ส่วนตัว & นำเข้า PDF จากไฟล์**: รายการไฟล์บนหน้าหลักอ้างอิงจาก Registry ส่วนตัวของแอปแทนการสแกนโฟลเดอร์ พร้อมตัวเลือก **นำเข้า PDF จากไฟล์ (Import PDF From File)** ในเมนูหน้าหลักเพื่อลงทะเบียนไฟล์ PDF ที่มีอยู่ และสามารถเลือกนำออกจากรายการเท่านั้นหรือลบไฟล์ออกจากเครื่องเมื่อลบรายการที่นำเข้า
 - **พรีวิวเอกสารก่อนส่งออก**: ดูตัวอย่างไฟล์ PDF ชั่วคราวได้ทันที พร้อมลบไฟล์ตัวอย่างอัตโนมัติเมื่อปิดหน้าจอพรีวิว
 - **รองรับการรับไฟล์แชร์จากแอปอื่น**: รับไฟล์รูปภาพ หรือแตกไฟล์รูปภาพจากไฟล์ Archive (เช่น `.zip`, `.tar.gz`) เพื่อนำเข้าสู่แอปได้โดยตรง พร้อมตัวเลือกแทนที่, ต่อท้ายรายการเดิม, หรือแปลงและแชร์ด่วน (Quick PDF)
 - **จัดการและจัดเรียงหน้าได้ง่าย**: ปรับเปลี่ยนลำดับของภาพ (ลากวางหรือกดเลื่อนตำแหน่ง) ลบภาพรายหน้า หรือล้างรายการทั้งหมด
@@ -54,11 +56,12 @@ flutter pub get
 ## โครงสร้างโปรเจกต์
 
 - [lib/main.dart](lib/main.dart): จุดเริ่มต้นของแอป การกำหนด Theme และการรองรับ Localizations
-- [lib/screens/home_screen.dart](lib/screens/home_screen.dart): หน้าแรกแสดงรายการ PDF และเมนูการตั้งค่าธีม/ภาษา
+- [lib/screens/home_screen.dart](lib/screens/home_screen.dart): หน้าแรกแสดงรายการ PDF จาก Registry เมนูนำเข้าไฟล์ PDF และเมนูการตั้งค่าธีม/ภาษา
 - [lib/screens/conversion_screen.dart](lib/screens/conversion_screen.dart): หน้าเลือกรูปภาพ จัดเรียง พรีวิว และส่งออกไฟล์เป็น PDF หรือ ZIP
-- [lib/services/file_service.dart](lib/services/file_service.dart): จัดการไฟล์ PDF ชั่วคราวและถาวร รวมถึงการแชร์ไฟล์
+- [lib/services/file_service.dart](lib/services/file_service.dart): จัดการการบันทึกลง `Documents/VibeQuickPDF/` ระบบ Registry ส่วนตัว การนำเข้าไฟล์ PDF ไฟล์ชั่วคราว รวมถึงการเปิด/แชร์/ลบไฟล์
 - [lib/services/pdf_service.dart](lib/services/pdf_service.dart): ตรรกะการสร้างเอกสาร PDF
 - [lib/services/archive_service.dart](lib/services/archive_service.dart): จัดการสร้างไฟล์ ZIP และแตกไฟล์รูปภาพจากไฟล์ประเภท Archive
-- [lib/models/pdf_file.dart](lib/models/pdf_file.dart): โมเดลข้อมูลเมตาของไฟล์ PDF
+- [lib/models/pdf_file.dart](lib/models/pdf_file.dart): โมเดลข้อมูลเมตาและสถานะการนำเข้าของไฟล์ PDF
 - [lib/widgets/shared_media_dialog.dart](lib/widgets/shared_media_dialog.dart): Dialog จัดการรูปภาพที่ได้รับจากการแชร์ (ต่อท้าย, สร้างใหม่, หรือ Quick PDF & Share)
 - [lib/l10n/app_localizations.dart](lib/l10n/app_localizations.dart): ระบบจัดการข้อความรองรับหลายภาษา (ไทย/อังกฤษ)
+- [android/app/src/main/kotlin/com/jittiponpannak/quick_vibe_pdf/MainActivity.kt](android/app/src/main/kotlin/com/jittiponpannak/quick_vibe_pdf/MainActivity.kt): ช่องทาง Native Android สำหรับบันทึกไฟล์ลง `Documents/VibeQuickPDF/` ผ่าน MediaStore และเลือก/จัดการไฟล์ PDF ผ่าน Storage Access Framework

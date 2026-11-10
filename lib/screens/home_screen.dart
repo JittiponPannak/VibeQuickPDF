@@ -220,22 +220,105 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
+  Future<void> _importPdfFromFile() async {
+    final l10n = AppLocalizations.of(context);
+    final result = await _fileService.importPdfFromFile();
+    if (!mounted) return;
+
+    switch (result.status) {
+      case ImportPdfStatus.imported:
+        await _loadFiles();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.pdfImportedSuccess)),
+          );
+        }
+        break;
+      case ImportPdfStatus.alreadyRegistered:
+        await _loadFiles();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.pdfAlreadyRegistered)),
+          );
+        }
+        break;
+      case ImportPdfStatus.unsupported:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.importPdfUnsupported)),
+        );
+        break;
+      case ImportPdfStatus.error:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.cannotImportPdf(result.errorMessage ?? '')),
+          ),
+        );
+        break;
+      case ImportPdfStatus.cancelled:
+        break;
+    }
+  }
+
   void _confirmDelete(PdfFile file) {
     final l10n = AppLocalizations.of(context);
+    if (file.isImported) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.deleteImportedPdfTitle),
+          content: Text(l10n.deleteImportedPdfConfirm(file.name)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await _fileService.unregisterPdf(file.path);
+                _loadFiles();
+              },
+              child: Text(l10n.removeFromListOnly),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                final deleted = await _fileService.deletePdfAndUnregister(file);
+                if (!deleted && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l10n.cannotDeleteFile)),
+                  );
+                }
+                _loadFiles();
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: Text(l10n.deleteFileFromDevice),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(l10n.deletePdfTitle),
         content: Text(l10n.deletePdfConfirm(file.name)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
-              await _fileService.deletePdf(file.path);
+              Navigator.pop(dialogContext);
+              final deleted = await _fileService.deletePdfAndUnregister(file);
+              if (!deleted && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(l10n.cannotDeleteFile)),
+                );
+              }
               _loadFiles();
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -315,6 +398,8 @@ class _HomeScreenState extends State<HomeScreen> {
             onSelected: (String value) {
               if (value == 'refresh') {
                 _loadFiles();
+              } else if (value == 'import_pdf') {
+                _importPdfFromFile();
               } else if (value == 'theme') {
                 final isDark = Theme.of(context).brightness == Brightness.dark;
                 appThemeModeNotifier.value =
@@ -337,6 +422,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Icon(Icons.refresh, size: 20),
                       const SizedBox(width: 12),
                       Expanded(child: Text(l10n.refresh)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'import_pdf',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.file_open, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(l10n.importPdfFromFile)),
                     ],
                   ),
                 ),
@@ -433,6 +528,15 @@ class _HomeScreenState extends State<HomeScreen> {
               itemCount: _pdfFiles.length,
               itemBuilder: (context, index) {
                 final file = _pdfFiles[index];
+                final isZip = file.name.toLowerCase().endsWith('.zip');
+                final subtitleParts = [
+                  DateFormat(
+                    'MMM d, yyyy HH:mm',
+                    l10n.locale.toString(),
+                  ).format(file.createdAt),
+                  _formatSize(file.size),
+                  if (file.isImported) l10n.importedBadge,
+                ];
                 return Card(
                   margin: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -441,13 +545,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   elevation: 2,
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: file.path.toLowerCase().endsWith('.zip')
-                          ? Colors.amber.shade700
-                          : Colors.redAccent,
+                      backgroundColor:
+                          isZip ? Colors.amber.shade700 : Colors.redAccent,
                       child: Icon(
-                        file.path.toLowerCase().endsWith('.zip')
-                            ? Icons.folder_zip
-                            : Icons.picture_as_pdf,
+                        isZip ? Icons.folder_zip : Icons.picture_as_pdf,
                         color: Colors.white,
                       ),
                     ),
@@ -455,10 +556,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       file.name,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    subtitle: Text(
-                      '${DateFormat('MMM d, yyyy HH:mm', l10n.locale.toString()).format(file.createdAt)} • ${_formatSize(file.size)}',
-                    ),
-                    onTap: () => _fileService.openPdf(file.path),
+                    subtitle: Text(subtitleParts.join(' • ')),
+                    onTap: () =>
+                        _fileService.openPdf(file.path, fileName: file.name),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -469,12 +569,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             final success = await _fileService.sharePdf(
                               file.path,
                               shareText: l10n.shareWatermark,
+                              fileName: file.name,
                             );
                             if (!success && context.mounted) {
                               _showRetryShareDialog(
                                 () => _fileService.sharePdf(
                                   file.path,
                                   shareText: l10n.shareWatermark,
+                                  fileName: file.name,
                                 ),
                               );
                             }
