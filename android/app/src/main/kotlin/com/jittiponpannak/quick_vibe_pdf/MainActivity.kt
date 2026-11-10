@@ -2,6 +2,7 @@ package com.jittiponpannak.vibe_quick_pdf
 
 import android.Manifest
 import android.app.Activity
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -20,6 +21,8 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
+import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
     companion object {
@@ -32,6 +35,12 @@ class MainActivity : FlutterActivity() {
     private var pendingPickResult: MethodChannel.Result? = null
     private var pendingSaveResult: MethodChannel.Result? = null
     private var pendingSaveArgs: Triple<String, String, ByteArray>? = null
+    private val ioExecutor = Executors.newSingleThreadExecutor()
+
+    override fun onDestroy() {
+        ioExecutor.shutdown()
+        super.onDestroy()
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -41,6 +50,7 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "saveToDocuments" -> handleSaveToDocuments(call, result)
                     "pickPdfFile" -> handlePickPdfFile(result)
+                    "findMatchingRegisteredPath" -> handleFindMatchingRegisteredPath(call, result)
                     "inspectUri" -> handleInspectUri(call, result)
                     "openUri" -> handleOpenUri(call, result)
                     "copyUriToTempFile" -> handleCopyUriToTempFile(call, result)
@@ -238,6 +248,306 @@ class MainActivity : FlutterActivity() {
             )
         }
         startActivityForResult(intent, REQUEST_PICK_PDF)
+    }
+
+    private data class FileIdentity(
+        val raw: String,
+        val mediaId: Long? = null,
+        val filePath: String? = null,
+        val relativePath: String? = null,
+        val size: Long? = null
+    )
+
+    private data class MediaStoreDetails(
+        val filePath: String? = null,
+        val relativePath: String? = null,
+        val size: Long? = null
+    )
+
+    private fun handleFindMatchingRegisteredPath(call: MethodCall, result: MethodChannel.Result) {
+        val uriString = call.argument<String>("uri")
+        val registeredPaths = call.argument<List<String>>("registeredPaths")
+        if (uriString.isNullOrBlank() || registeredPaths.isNullOrEmpty()) {
+            result.success(null)
+            return
+        }
+
+        ioExecutor.execute {
+            val matched = try {
+                findMatchingRegisteredPathSync(uriString, registeredPaths)
+            } catch (_: Exception) {
+                null
+            }
+            runOnUiThread {
+                result.success(matched)
+            }
+        }
+    }
+
+    private fun findMatchingRegisteredPathSync(
+        pickedUriString: String,
+        registeredPaths: List<String>
+    ): String? {
+        if (registeredPaths.contains(pickedUriString)) {
+            return pickedUriString
+        }
+
+        val picked = resolveFileIdentity(pickedUriString)
+        val registered = registeredPaths.map { resolveFileIdentity(it) }
+
+        // 1. Fast match by MediaStore ID, canonical file path, or primary relative path
+        for (reg in registered) {
+            if (picked.mediaId != null && reg.mediaId != null && picked.mediaId == reg.mediaId) {
+                return reg.raw
+            }
+            if (picked.filePath != null && reg.filePath != null && picked.filePath == reg.filePath) {
+                return reg.raw
+            }
+            if (picked.relativePath != null && reg.relativePath != null && picked.relativePath == reg.relativePath) {
+                return reg.raw
+            }
+        }
+
+        // 2. Fallback match by exact size + SHA-256 content hash (for third-party/OEM providers)
+        val pickedSize = picked.size
+        if (pickedSize != null && pickedSize > 0L) {
+            val sizeCandidates = registered.filter { it.size == pickedSize }
+            if (sizeCandidates.isNotEmpty()) {
+                val pickedHash = computeSha256(pickedUriString)
+                if (pickedHash != null) {
+                    for (reg in sizeCandidates) {
+                        val regHash = computeSha256(reg.raw)
+                        if (regHash != null && regHash == pickedHash) {
+                            return reg.raw
+                        }
+                    }
+                }
+            }
+        }
+
+        return null
+    }
+
+    private fun resolveFileIdentity(pathOrUri: String): FileIdentity {
+        if (!pathOrUri.startsWith("content://")) {
+            val path = if (pathOrUri.startsWith("file://")) {
+                Uri.parse(pathOrUri).path
+            } else {
+                pathOrUri
+            }
+            if (path.isNullOrBlank()) return FileIdentity(raw = pathOrUri)
+            val file = File(path)
+            val canonical = try { file.canonicalPath } catch (_: Exception) { file.absolutePath }
+            val size = if (file.exists()) file.length() else null
+            return FileIdentity(
+                raw = pathOrUri,
+                filePath = canonical,
+                relativePath = extractPrimaryRelativePath(canonical),
+                size = size
+            )
+        }
+
+        val uri = Uri.parse(pathOrUri)
+        var mediaId: Long? = null
+        var filePath: String? = null
+        var relativePath: String? = null
+        var size: Long? = null
+
+        if (uri.authority == "media") {
+            mediaId = try {
+                ContentUris.parseId(uri).takeIf { it >= 0L }
+            } catch (_: Exception) {
+                null
+            }
+            val details = queryMediaStoreDetails(uri)
+            filePath = details.filePath
+            relativePath = details.relativePath
+            size = details.size
+        } else {
+            if (DocumentsContract.isDocumentUri(this, uri)) {
+                val docId = try { DocumentsContract.getDocumentId(uri) } catch (_: Exception) { null }
+                if (!docId.isNullOrBlank()) {
+                    when (uri.authority) {
+                        "com.android.externalstorage.documents" -> {
+                            if (docId.startsWith("primary:")) {
+                                val rel = docId.removePrefix("primary:").trimStart('/')
+                                if (rel.isNotEmpty()) {
+                                    relativePath = rel.lowercase()
+                                    val candidate = File(Environment.getExternalStorageDirectory(), rel)
+                                    filePath = try { candidate.canonicalPath } catch (_: Exception) { candidate.absolutePath }
+                                }
+                            } else if (docId.startsWith("raw:")) {
+                                val rawPath = docId.removePrefix("raw:")
+                                if (rawPath.isNotEmpty()) {
+                                    filePath = try { File(rawPath).canonicalPath } catch (_: Exception) { rawPath }
+                                    relativePath = filePath?.let { extractPrimaryRelativePath(it) }
+                                }
+                            }
+                        }
+                        "com.android.providers.media.documents" -> {
+                            val idPart = docId.substringAfter(':', "")
+                            mediaId = idPart.toLongOrNull()?.takeIf { it >= 0L }
+                        }
+                        "com.android.providers.downloads.documents" -> {
+                            if (docId.startsWith("msf:")) {
+                                mediaId = docId.removePrefix("msf:").toLongOrNull()?.takeIf { it >= 0L }
+                            } else if (docId.startsWith("raw:")) {
+                                val rawPath = docId.removePrefix("raw:")
+                                if (rawPath.isNotEmpty()) {
+                                    filePath = try { File(rawPath).canonicalPath } catch (_: Exception) { rawPath }
+                                    relativePath = filePath?.let { extractPrimaryRelativePath(it) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && (mediaId == null || filePath == null)) {
+                val mediaUri = try {
+                    MediaStore.getMediaUri(this, uri)
+                } catch (_: Exception) {
+                    null
+                }
+                if (mediaUri != null && mediaUri.authority == "media") {
+                    if (mediaId == null) {
+                        mediaId = try {
+                            ContentUris.parseId(mediaUri).takeIf { it >= 0L }
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                    val details = queryMediaStoreDetails(mediaUri)
+                    if (filePath == null) filePath = details.filePath
+                    if (relativePath == null) relativePath = details.relativePath
+                    if (size == null) size = details.size
+                }
+            }
+
+            if (size == null) {
+                size = (try { queryUriMetadata(uri)?.get("size") as? Long } catch (_: Exception) { null })
+                    ?.takeIf { it > 0L }
+                    ?: try {
+                        contentResolver.openAssetFileDescriptor(uri, "r")?.use {
+                            if (it.length > 0L) it.length else null
+                        }
+                    } catch (_: Exception) {
+                        null
+                    }
+            }
+        }
+
+        return FileIdentity(
+            raw = pathOrUri,
+            mediaId = mediaId,
+            filePath = filePath,
+            relativePath = relativePath,
+            size = size
+        )
+    }
+
+    @Suppress("DEPRECATION")
+    private fun queryMediaStoreDetails(uri: Uri): MediaStoreDetails {
+        var filePath: String? = null
+        var relativePath: String? = null
+        var size: Long? = null
+
+        try {
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (!cursor.moveToFirst()) return MediaStoreDetails()
+
+                val sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (sizeIdx >= 0 && !cursor.isNull(sizeIdx)) {
+                    size = cursor.getLong(sizeIdx).takeIf { it > 0L }
+                }
+
+                val dataIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+                if (dataIdx >= 0 && !cursor.isNull(dataIdx)) {
+                    val rawPath = cursor.getString(dataIdx)
+                    if (!rawPath.isNullOrBlank()) {
+                        filePath = try { File(rawPath).canonicalPath } catch (_: Exception) { rawPath }
+                        relativePath = filePath?.let { extractPrimaryRelativePath(it) }
+                    }
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val volIdx = cursor.getColumnIndex(MediaStore.MediaColumns.VOLUME_NAME)
+                    val relIdx = cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    val volume = if (volIdx >= 0 && !cursor.isNull(volIdx)) cursor.getString(volIdx) else null
+                    val relDir = if (relIdx >= 0 && !cursor.isNull(relIdx)) cursor.getString(relIdx) else null
+                    val displayName = if (nameIdx >= 0 && !cursor.isNull(nameIdx)) cursor.getString(nameIdx) else null
+                    if (!relDir.isNullOrBlank() && !displayName.isNullOrBlank()) {
+                        val isPrimaryVolume = volume == null ||
+                            volume.equals("external_primary", ignoreCase = true) ||
+                            volume.equals("external", ignoreCase = true)
+                        if (isPrimaryVolume) {
+                            val combinedRel = "${relDir.trimEnd('/')}/$displayName".trimStart('/')
+                            if (relativePath == null) {
+                                relativePath = combinedRel.lowercase()
+                            }
+                            if (filePath == null) {
+                                val candidate = File(Environment.getExternalStorageDirectory(), combinedRel)
+                                if (candidate.exists()) {
+                                    filePath = try { candidate.canonicalPath } catch (_: Exception) { candidate.absolutePath }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // Ignore provider errors for unreadable/revoked URIs
+        }
+
+        return MediaStoreDetails(
+            filePath = filePath,
+            relativePath = relativePath,
+            size = size
+        )
+    }
+
+    private fun extractPrimaryRelativePath(canonicalPath: String): String? {
+        val extRoot = try {
+            Environment.getExternalStorageDirectory().canonicalPath
+        } catch (_: Exception) {
+            Environment.getExternalStorageDirectory().absolutePath
+        }.trimEnd('/')
+        val prefix = "$extRoot/"
+        return if (canonicalPath.startsWith(prefix, ignoreCase = true)) {
+            canonicalPath.substring(prefix.length).trimStart('/').lowercase()
+        } else {
+            null
+        }
+    }
+
+    private fun computeSha256(pathOrUri: String): String? {
+        return try {
+            val inputStream = if (pathOrUri.startsWith("content://")) {
+                contentResolver.openInputStream(Uri.parse(pathOrUri))
+            } else {
+                val filePath = if (pathOrUri.startsWith("file://")) {
+                    Uri.parse(pathOrUri).path
+                } else {
+                    pathOrUri
+                } ?: return null
+                val file = File(filePath)
+                if (!file.exists()) return null
+                file.inputStream()
+            } ?: return null
+
+            inputStream.use { stream ->
+                val digest = MessageDigest.getInstance("SHA-256")
+                val buffer = ByteArray(8192)
+                var read: Int
+                while (stream.read(buffer).also { read = it } != -1) {
+                    digest.update(buffer, 0, read)
+                }
+                digest.digest().joinToString("") { "%02x".format(it) }
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun handleInspectUri(call: MethodCall, result: MethodChannel.Result) {

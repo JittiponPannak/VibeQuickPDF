@@ -168,6 +168,96 @@ void main() {
       expect(mediaStore.containsKey(listed.first.path), isFalse);
       expect(await service.getPdfFiles(), isEmpty);
     });
+
+    test('prevents importing an exported PDF picked via a different SAF URI', () async {
+      const storageChannel =
+          MethodChannel('com.jittiponpannak.vibe_quick_pdf/storage');
+      const exportedMediaUri = 'content://media/external/file/99';
+      const pickedSafUri =
+          'content://com.android.externalstorage.documents/document/primary%3ADocuments%2FVibeQuickPDF%2FExported.pdf';
+      const unrelatedSafUri =
+          'content://com.android.externalstorage.documents/document/primary%3ADownload%2FOther.pdf';
+
+      String nextPickedUri = pickedSafUri;
+      String nextPickedName = 'Exported.pdf';
+      int nextPickedSize = 100;
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(storageChannel, (MethodCall call) async {
+            switch (call.method) {
+              case 'saveToDocuments':
+                final args = Map<String, dynamic>.from(call.arguments as Map);
+                final bytes = args['bytes'] as Uint8List;
+                return {
+                  'path': exportedMediaUri,
+                  'name': 'Exported.pdf',
+                  'size': bytes.length,
+                  'createdAt': 1700000000000,
+                };
+              case 'pickPdfFile':
+                return {
+                  'path': nextPickedUri,
+                  'name': nextPickedName,
+                  'size': nextPickedSize,
+                  'createdAt': 1700000200000,
+                };
+              case 'findMatchingRegisteredPath':
+                final args = Map<String, dynamic>.from(call.arguments as Map);
+                final picked = args['uri'] as String;
+                final registered = List<String>.from(args['registeredPaths'] as List);
+                if (picked == pickedSafUri && registered.contains(exportedMediaUri)) {
+                  return exportedMediaUri;
+                }
+                return null;
+              case 'inspectUri':
+                final args = Map<String, dynamic>.from(call.arguments as Map);
+                final uri = args['uri'] as String;
+                if (uri == exportedMediaUri) {
+                  return {
+                    'name': 'Exported.pdf',
+                    'size': 100,
+                    'createdAt': 1700000000000,
+                  };
+                }
+                if (uri == unrelatedSafUri) {
+                  return {
+                    'name': 'Other.pdf',
+                    'size': 200,
+                    'createdAt': 1700000200000,
+                  };
+                }
+                return null;
+            }
+            return null;
+          });
+
+      final service = FileService(isAndroid: true);
+      final savedPath = await service.savePdf('Exported', List<int>.filled(100, 7));
+      expect(savedPath, exportedMediaUri);
+
+      // Picking the exported file via SAF document URI is blocked as alreadyRegistered
+      final duplicateResult = await service.importPdfFromFile();
+      expect(duplicateResult.status, ImportPdfStatus.alreadyRegistered);
+      expect(duplicateResult.file?.path, exportedMediaUri);
+      expect(duplicateResult.file?.isImported, isFalse);
+
+      var listed = await service.getPdfFiles();
+      expect(listed.length, 1);
+      expect(listed.first.path, exportedMediaUri);
+      expect(listed.first.isImported, isFalse);
+
+      // Picking a different PDF is still allowed
+      nextPickedUri = unrelatedSafUri;
+      nextPickedName = 'Other.pdf';
+      nextPickedSize = 200;
+      final newResult = await service.importPdfFromFile();
+      expect(newResult.status, ImportPdfStatus.imported);
+      expect(newResult.file?.path, unrelatedSafUri);
+      expect(newResult.file?.isImported, isTrue);
+
+      listed = await service.getPdfFiles();
+      expect(listed.length, 2);
+    });
   });
 
   group('HomeScreen registry & import UI', () {

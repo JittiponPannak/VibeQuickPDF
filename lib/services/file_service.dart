@@ -323,6 +323,16 @@ class FileService {
         return ImportPdfResult.alreadyRegistered(existing);
       }
 
+      if (entries.isNotEmpty) {
+        final matchedPath = await _findMatchingRegisteredPath(uriPath, entries);
+        if (matchedPath != null) {
+          final matchedIdx = entries.indexWhere((e) => e.path == matchedPath);
+          if (matchedIdx != -1) {
+            return ImportPdfResult.alreadyRegistered(entries[matchedIdx]);
+          }
+        }
+      }
+
       final newEntry = PdfFile(
         name: name,
         path: uriPath,
@@ -335,6 +345,26 @@ class FileService {
       return ImportPdfResult.imported(newEntry);
     } catch (e) {
       return ImportPdfResult.error(e.toString());
+    }
+  }
+
+  Future<String?> _findMatchingRegisteredPath(
+    String pickedUri,
+    List<PdfFile> entries,
+  ) async {
+    try {
+      return await _storageChannel.invokeMethod<String>(
+        'findMatchingRegisteredPath',
+        {
+          'uri': pickedUri,
+          'registeredPaths': entries.map((e) => e.path).toList(),
+        },
+      );
+    } on MissingPluginException {
+      return null;
+    } catch (e) {
+      debugPrint("Error matching imported URI to registry: $e");
+      return null;
     }
   }
 
